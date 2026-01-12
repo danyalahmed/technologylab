@@ -9,8 +9,9 @@ spec:
     chart: base
     repoURL: https://istio-release.storage.googleapis.com/charts
     targetRevision: 1.28.2
-    values: |
-      defaultRevision: default
+    helm:
+      values: |
+        defaultRevision: default
   destination:
     server: https://kubernetes.default.svc
     namespace: istio-system
@@ -32,13 +33,14 @@ spec:
     chart: istiod
     repoURL: https://istio-release.storage.googleapis.com/charts
     targetRevision: 1.28.2
-    values: |
-      profile: ambient
-      pilot:
-        env:
-          PILOT_ENABLE_AMBIENT: "true"
-        cni:
-          enabled: true
+    helm:
+      values: |
+        profile: ambient
+        pilot:
+          env:
+            PILOT_ENABLE_AMBIENT: "true"
+          cni:
+            enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: istio-system
@@ -60,8 +62,9 @@ spec:
     chart: cni
     repoURL: https://istio-release.storage.googleapis.com/charts
     targetRevision: 1.28.2
-    values: |
-      profile: ambient
+    helm:
+      values: |
+        profile: ambient
   destination:
     server: https://kubernetes.default.svc
     namespace: istio-system
