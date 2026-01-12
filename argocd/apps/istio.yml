@@ -3,8 +3,6 @@ kind: Application
 metadata:
   name: istio-base
   namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "1" # Ensure this app syncs before others
 spec:
   project: infrastructure
   source:
@@ -28,8 +26,6 @@ kind: Application
 metadata:
   name: istio-istiod
   namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "1" # Ensure this app syncs before others
 spec:
   project: infrastructure
   source:
@@ -40,7 +36,7 @@ spec:
       profile: ambient
       pilot:
         env:
-          PILOT_ENABLE_AMBIENT: true
+          PILOT_ENABLE_AMBIENT: "true"
         cni:
           enabled: true
   destination:
@@ -58,8 +54,6 @@ kind: Application
 metadata:
   name: istio-cni
   namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "1" # Ensure this app syncs before others
 spec:
   project: infrastructure
   source:
@@ -83,8 +77,6 @@ kind: Application
 metadata:
   name: istio-ztunnel
   namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "1" # Ensure this app syncs before others
 spec:
   project: infrastructure
   source:

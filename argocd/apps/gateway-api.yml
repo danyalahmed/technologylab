@@ -3,8 +3,6 @@ kind: Application
 metadata:
   name: gateway-api
   namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "1" # Ensure this app syncs before others
 spec:
   project: infrastructure
   source:
