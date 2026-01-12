@@ -37,7 +37,10 @@ spec:
     repoURL: https://istio-release.storage.googleapis.com/charts
     targetRevision: 1.28.2
     values: |
+      profile: ambient
       pilot:
+        env: |
+          PILOT_ENABLE_AMBIENT: true
         cni:
           enabled: true
   destination:
