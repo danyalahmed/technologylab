@@ -39,7 +39,7 @@ spec:
     values: |
       profile: ambient
       pilot:
-        env: |
+        env:
           PILOT_ENABLE_AMBIENT: true
         cni:
           enabled: true
