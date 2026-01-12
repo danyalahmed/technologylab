@@ -1,0 +1,156 @@
+---
+- name: Prepare Nodes for Kubernetes
+  hosts: k8s_nodes
+  become: yes
+  become_method: sudo
+  tasks:
+    - name: Allow SSH
+      ufw:
+        rule: allow
+        name: OpenSSH
+
+    - name: Open Controlplane Ports
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - 6443    # Kubernetes API server
+        - 2379:2380  # etcd server client API
+        - 10250   # Kubelet API
+        - 10251   # kube-scheduler
+        - 10257   # kube-controller-manager
+      when: "'controlplane' in group_names"
+
+    - name: Open Worker Node TCP Ports
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - 10250   # Kubelet API
+        - 10256   # kube-proxy
+        - 30000:32767  # NodePort Services
+      when: "'workers' in group_names"
+
+    - name: Open Worker Node UDP Ports
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: udp
+      loop:
+        - 30000:32767  # NodePort Services
+      when: "'workers' in group_names"
+
+    - name: Allow Routed Traffic
+      command: ufw default allow routed
+
+    - name: Allow Calico BGP
+      community.general.ufw:
+        rule: allow
+        port: '179'
+        proto: tcp
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+        policy: deny
+
+    - name: Disable Swap
+      command: swapoff -a
+      when: ansible_facts['swaptotal_mb'] > 0
+
+    - name: Remove Swap Entry from fstab
+      mount:
+        name: none
+        fstype: swap
+        state: absent
+      when: ansible_facts['swaptotal_mb'] > 0
+
+    - name: Load required kernel modules
+      modprobe:
+        name: "{{ item }}"
+        state: present
+      loop: [ 'overlay', 'br_netfilter' ]
+
+    - name: Persist kernel modules on boot
+      copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          overlay
+          br_netfilter
+
+    - name: Enable IPv4 forwarding and Bridge traffic
+      sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        state: present
+        sysctl_set: yes
+        reload: yes
+      loop:
+        - { key: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+        - { key: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+        - { key: 'net.ipv4.ip_forward', value: '1' }
+
+    - name: Install Containerd
+      apt:
+        name: containerd
+        state: present
+
+    - name: Create Containerd directory
+      file:
+        path: /etc/containerd
+        state: directory
+
+    - name: Generate default containerd config
+      shell: containerd config default > /etc/containerd/config.toml
+      args:
+        creates: /etc/containerd/config.toml
+
+    - name: Set SystemdCgroup to true
+      lineinfile:
+        path: /etc/containerd/config.toml
+        regexp: 'SystemdCgroup = false'
+        line: '            SystemdCgroup = true'
+        state: present
+
+    - name: Restart Containerd
+      service:
+        name: containerd
+        state: restarted
+        enabled: yes
+
+    - name: Install dependencies for K8s
+      apt:
+        name: [ 'apt-transport-https', 'ca-certificates', 'curl', 'gpg' ]
+        state: present
+
+    - name: Create directory for K8s keyring
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download Kubernetes GPG key
+      get_url:
+        url: https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key
+        dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
+        mode: '0644'
+
+    - name: Add Kubernetes repository
+      apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v1.35/deb/ /"
+        state: present
+        filename: kubernetes
+
+    - name: Install Kubeadm, Kubelet, and Kubectl
+      apt:
+        name: [ 'kubelet', 'kubeadm', 'kubectl' ]
+        state: present
+        update_cache: yes
+
+    - name: Hold Kubernetes packages at current version
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop: [ 'kubelet', 'kubeadm', 'kubectl' ]
