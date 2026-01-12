@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: git@github.com:danyalahmed/technologylab.git
     targetRevision: HEAD
-    path: infrastructure/gateway-api
+    path: argocd/infrastructure/gateway-api
   destination:
     server: https://kubernetes.default.svc
     namespace: gateway-system
