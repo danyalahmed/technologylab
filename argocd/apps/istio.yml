@@ -1,0 +1,99 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-base
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1" # Ensure this app syncs before others
+spec:
+  project: infrastructure
+  source:
+    chart: base
+    repoURL: https://istio-release.storage.googleapis.com/charts
+    targetRevision: 1.28.2
+    values: |
+      defaultRevision: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-istiod
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1" # Ensure this app syncs before others
+spec:
+  project: infrastructure
+  source:
+    chart: istiod
+    repoURL: https://istio-release.storage.googleapis.com/charts
+    targetRevision: 1.28.2
+    values: |
+      pilot:
+        cni:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-cni
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1" # Ensure this app syncs before others
+spec:
+  project: infrastructure
+  source:
+    chart: cni
+    repoURL: https://istio-release.storage.googleapis.com/charts
+    targetRevision: 1.28.2
+    values: |
+      profile: ambient
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-ztunnel
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1" # Ensure this app syncs before others
+spec:
+  project: infrastructure
+  source:
+    chart: ztunnel
+    repoURL: https://istio-release.storage.googleapis.com/charts
+    targetRevision: 1.28.2
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
