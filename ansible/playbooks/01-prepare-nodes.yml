@@ -56,6 +56,17 @@
         state: enabled
         policy: deny
 
+    - name: Enable IP Masquerade for Pod Network in UFW
+      blockinfile:
+        path: /etc/ufw/before.rules
+        insertbefore: BOF
+        block: |
+          *nat
+          :POSTROUTING ACCEPT [0:0]
+          -A POSTROUTING -s 192.168.0.0/16 -o {{ ansible_default_ipv4.interface }} -j MASQUERADE
+          COMMIT
+      notify: Reload UFW
+
     - name: Disable Swap
       command: swapoff -a
       when: ansible_facts['swaptotal_mb'] > 0
@@ -154,3 +165,6 @@
         name: "{{ item }}"
         selection: hold
       loop: [ 'kubelet', 'kubeadm', 'kubectl' ]
+  handlers:
+    - name: Reload UFW
+      command: ufw reload
