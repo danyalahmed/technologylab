@@ -36,28 +36,5 @@
     - name: Install Calico with Tigera Operator
       become: no
       shell: |
-        kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/tigera-operator.yaml
         kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/custom-resources.yaml
-
-    - name: Generate join command for worker nodes
-      command: kubeadm token create --print-join-command
-      register: join_command_raw
-
-    - name: Set join command fact
-      set_fact:
-        join_command: "{{ join_command_raw.stdout }}"
-
-- name: Join Kubernetes Worker Nodes to Control Plane
-  hosts: workers
-  become: yes
-  tasks:
-    - name: Check if node is already joined to the cluster
-      stat:
-        path: /etc/kubernetes/kubelet.conf
-      register: node_joined
-
-    - name: Join the node to the Kubernetes cluster
-      command: "{{ hostvars[groups['controlplane'][0]].join_command }} --node-name={{ inventory_hostname }}"
-      args:
-        creates: /etc/kubernetes/kubelet.conf
-      when: not node_joined.stat.exists
+        kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/tigera-operator.yaml

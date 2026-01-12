@@ -23,8 +23,8 @@ resource "local_file" "ansible_inventory" {
         var.physical_controlplane_ips
       ) : ip if ip != null
     ]
-    worker_ips    = var.physical_worker_ips
-    ansible_user  = var.ansible_user
+    worker_ips   = var.physical_worker_ips
+    ansible_user = var.ansible_user
   })
 
   filename = "${path.module}/../ansible/hosts.ini"
@@ -33,12 +33,13 @@ resource "local_file" "ansible_inventory" {
 # Auto-generate Ansible variables from Terraform versions
 resource "local_file" "ansible_vars" {
   content = yamlencode({
-    kubernetes_version       = local.kubernetes_version
-    kubernetes_minor_version = local.kubernetes_minor_version
-    calico_version          = local.calico_version
-    pod_network_cidr        = local.pod_network_cidr
-    ansible_user            = var.ansible_user
+    kubernetes_version           = local.kubernetes_version
+    kubernetes_minor_version     = local.kubernetes_minor_version
+    calico_version               = local.calico_version
+    pod_network_cidr             = local.pod_network_cidr
+    ansible_user                 = var.ansible_user
     ansible_ssh_private_key_file = var.ansible_ssh_key_path
+    argocd_version               = local.argocd_version
   })
 
   filename = "${path.module}/../ansible/group_vars/all.yml"
@@ -58,28 +59,50 @@ resource "null_resource" "wait_for_vms" {
     command = <<-EOT
       echo "Waiting for VMs to be ready..."
       sleep 30
-      ansible all -i ${path.module}/../ansible/hosts.ini -m ping --private-key=${var.ansible_ssh_key_path} -o
+      ANSIBLE_HOST_KEY_CHECKING=False ansible all -i ${path.module}/../ansible/hosts.ini -m ping --private-key=${var.ansible_ssh_key_path} -o
     EOT
   }
+}
+
+# Run Ansible playbook to install python dependencies
+resource "null_resource" "ansible_install_python" {
+  count = var.auto_run_ansible ? 1 : 0
+
+  depends_on = [null_resource.wait_for_vms]
+
+  triggers = {
+    inventory_hash = local_file.ansible_inventory.content
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+        cd ${path.module}/../ansible
+        echo "\n=== Installing Python dependencies on all nodes ==="
+        ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/00-install-python-deps.yml \
+            --private-key=${var.ansible_ssh_key_path} \
+            ${var.sudo_password != "" ? "-e ansible_become_password=${var.sudo_password}" : ""}
+        EOT
+  }
+
 }
 
 # Run Ansible playbook to prepare nodes
 resource "null_resource" "ansible_prepare_nodes" {
   count = var.auto_run_ansible ? 1 : 0
 
-  depends_on = [null_resource.wait_for_vms]
+  depends_on = [null_resource.ansible_install_python]
 
   triggers = {
     kubernetes_version = local.kubernetes_version
-    calico_version    = local.calico_version
-    inventory_hash    = local_file.ansible_inventory.content
+    calico_version     = local.calico_version
+    inventory_hash     = local_file.ansible_inventory.content
   }
 
   provisioner "local-exec" {
     command = <<-EOT
       cd ${path.module}/../ansible
       echo "\n=== Preparing Kubernetes nodes ==="
-      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/prepare-nodes.yml \
+      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/01-prepare-nodes.yml \
         --private-key=${var.ansible_ssh_key_path} \
         ${var.sudo_password != "" ? "-e ansible_become_password=${var.sudo_password}" : ""}
     EOT
@@ -94,15 +117,61 @@ resource "null_resource" "ansible_init_cluster" {
 
   triggers = {
     kubernetes_version = local.kubernetes_version
-    calico_version    = local.calico_version
-    prepare_nodes_id  = null_resource.ansible_prepare_nodes[0].id
+    calico_version     = local.calico_version
+    prepare_nodes_id   = null_resource.ansible_prepare_nodes[0].id
   }
 
   provisioner "local-exec" {
     command = <<-EOT
       cd ${path.module}/../ansible
       echo "\n=== Initializing Kubernetes cluster ==="
-      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/kubeadm-init.yml \
+      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/02-init-controlplane.yml \
+        --private-key=${var.ansible_ssh_key_path} \
+        ${var.sudo_password != "" ? "-e ansible_become_password=${var.sudo_password}" : ""}
+    EOT
+  }
+}
+
+
+# Run Ansible playbook to join worker nodes
+resource "null_resource" "ansible_join_workers" {
+  count = var.auto_run_ansible ? 1 : 0
+
+  depends_on = [null_resource.ansible_init_cluster]
+
+  triggers = {
+    kubernetes_version = local.kubernetes_version
+    init_cluster_id    = null_resource.ansible_init_cluster[0].id
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+        cd ${path.module}/../ansible
+        echo "\n=== Joining worker nodes to Kubernetes cluster ==="
+        ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/03-join-workers.yml \
+            --private-key=${var.ansible_ssh_key_path} \
+            ${var.sudo_password != "" ? "-e ansible_become_password=${var.sudo_password}" : ""}
+        EOT
+  }
+}
+
+# Run Ansible playbook setup ArgoCD
+resource "null_resource" "ansible_setup_argocd" {
+  count = var.auto_run_ansible ? 1 : 0
+
+  depends_on = [null_resource.ansible_init_cluster]
+
+  triggers = {
+    kubernetes_version = local.kubernetes_version
+    init_cluster_id    = null_resource.ansible_init_cluster[0].id
+    argocd_version     = local.argocd_version
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      cd ${path.module}/../ansible
+      echo "\n=== Setting up ArgoCD ==="
+      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/04-bootstrap-argocd.yml \
         --private-key=${var.ansible_ssh_key_path} \
         ${var.sudo_password != "" ? "-e ansible_become_password=${var.sudo_password}" : ""}
     EOT
