@@ -1,0 +1,41 @@
+# Example Terraform variables file
+# Copy this to terraform.auto.tfvars and update with your values
+
+proxmox_api_url = "https://your-proxmox-server:8006/api2/json"
+
+# VM Configuration
+proxmox_vm_config = {
+  kubernetes-controlplane-01 = {
+    cpu_cores = 2
+    memory_mb = 4096
+    ipconfig0 = "ip=192.168.1.81/24,gw=192.168.1.1"
+  }
+  # Add more control plane nodes as needed
+  # kubernetes-controlplane-02 = {
+  #   cpu_cores = 2
+  #   memory_mb = 4096
+  #   ipconfig0 = "ip=192.168.1.82/24,gw=192.168.1.1"
+  # }
+}
+
+# Physical (bare metal) control plane nodes (optional)
+physical_controlplane_ips = []
+
+# Physical (bare metal) worker nodes
+physical_worker_ips = [
+  "192.168.1.91",
+  # "192.168.1.92",
+]
+
+# Ansible Configuration
+ansible_user = "your-username"
+
+# Path to SSH private key for Ansible (default: ~/.ssh/id_rsa)
+ansible_ssh_key_path = "~/.ssh/id_rsa"
+
+# WARNING: Store this securely! Consider using Ansible Vault instead
+sudo_password = "your-sudo-password"
+
+# Automatically run Ansible playbooks after VMs are created (default: true)
+# Set to false if you want to run Ansible manually
+auto_run_ansible = true

@@ -1,0 +1,16 @@
+# Ansible Vault Example
+# Use this to securely store passwords
+# 
+# Create encrypted vault:
+#   ansible-vault create ansible/group_vars/vault.yml
+#
+# Edit encrypted vault:
+#   ansible-vault edit ansible/group_vars/vault.yml
+#
+# Add to vault.yml:
+---
+vault_sudo_password: your-secure-password
+vault_ansible_become_password: your-secure-password
+
+# Then reference in your playbooks:
+# ansible_become_password: "{{ vault_ansible_become_password }}"
