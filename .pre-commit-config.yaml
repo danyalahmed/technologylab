@@ -1,0 +1,79 @@
+repos:
+  # Terraform hooks
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.96.1
+    hooks:
+      - id: terraform_fmt
+        name: Terraform format
+        description: Format Terraform files with terraform fmt
+        
+      - id: terraform_validate
+        name: Terraform validate
+        description: Validate Terraform configuration
+        
+      - id: terraform_docs
+        name: Terraform docs
+        description: Generate Terraform documentation
+        args:
+          - --args=--output-file=TERRAFORM.md
+          - --args=--output-mode=inject
+          
+      - id: terraform_tflint
+        name: Terraform lint
+        description: Lint Terraform with tflint
+        args:
+          - --args=--config=__GIT_WORKING_DIR__/.tflint.hcl
+
+  # Ansible hooks
+  - repo: https://github.com/ansible/ansible-lint
+    rev: v24.12.2
+    hooks:
+      - id: ansible-lint
+        name: Ansible lint
+        description: Lint Ansible playbooks
+        files: \.(yaml|yml)$
+        args:
+          - --exclude=.terraform/
+          - --exclude=argocd/
+
+  # General hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+        
+      - id: end-of-file-fixer
+        name: Fix end of files
+        
+      - id: check-yaml
+        name: Check YAML syntax
+        args: ['--unsafe']
+        exclude: ^argocd/
+        
+      - id: check-added-large-files
+        name: Check for large files
+        args: ['--maxkb=500']
+        
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+        
+      - id: detect-private-key
+        name: Detect private keys
+        exclude: \.pub$
+
+  # YAML formatting
+  - repo: https://github.com/google/yamlfmt
+    rev: v0.13.0
+    hooks:
+      - id: yamlfmt
+        name: Format YAML files
+        exclude: ^(argocd/|ansible/templates/)
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.43.0
+    hooks:
+      - id: markdownlint
+        name: Markdown lint
+        args: ['--fix']
