@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: istio-base
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   project: infrastructure
   source:
@@ -27,6 +29,8 @@ kind: Application
 metadata:
   name: istio-istiod
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   project: infrastructure
   source:
@@ -56,6 +60,8 @@ kind: Application
 metadata:
   name: istio-cni
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   project: infrastructure
   source:
@@ -80,6 +86,8 @@ kind: Application
 metadata:
   name: istio-ztunnel
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
 spec:
   project: infrastructure
   source:
