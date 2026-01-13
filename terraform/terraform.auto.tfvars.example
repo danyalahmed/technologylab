@@ -38,4 +38,4 @@ sudo_password = "your-sudo-password"
 
 # Automatically run Ansible playbooks after VMs are created (default: true)
 # Set to false if you want to run Ansible manually
-auto_run_ansible = true
+auto_run_ansible = false

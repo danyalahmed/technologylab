@@ -12,19 +12,22 @@ module "kubernetes_controlplane_vms" {
   ipconfig0           = each.value.ipconfig0
 }
 
+locals {
+  controlplane_ips = [
+    for ip in concat(
+      [for _, m in module.kubernetes_controlplane_vms : m.ip],
+      var.physical_controlplane_ips
+    ) : ip if ip != null
+  ]
+}
+
 # Generate Ansible inventory file from VM outputs
 resource "local_file" "ansible_inventory" {
   depends_on = [module.kubernetes_controlplane_vms]
 
   content = templatefile("${path.module}/../ansible/templates/inventory.tftpl", {
-    controlplane_ips = [
-      for ip in concat(
-        [for _, m in module.kubernetes_controlplane_vms : m.ip],
-        var.physical_controlplane_ips
-      ) : ip if ip != null
-    ]
-    worker_ips   = var.physical_worker_ips
-    ansible_user = var.ansible_user
+    controlplane_ips = local.controlplane_ips
+    worker_ips       = var.physical_worker_ips
   })
 
   filename = "${path.module}/../ansible/hosts.ini"
@@ -34,12 +37,17 @@ resource "local_file" "ansible_inventory" {
 resource "local_file" "ansible_vars" {
   content = yamlencode({
     kubernetes_version           = local.kubernetes_version
-    kubernetes_minor_version     = local.kubernetes_minor_version
+    kubernetes_version_short     = local.kubernetes_version_short
     calico_version               = local.calico_version
     pod_network_cidr             = local.pod_network_cidr
     ansible_user                 = var.ansible_user
     ansible_ssh_private_key_file = var.ansible_ssh_key_path
     argocd_version               = local.argocd_version
+    kubelet_csr_ip_prefixes      = var.kubelet_csr_ip_prefixes
+    desired_dns_servers          = join(" ", var.desired_dns_servers)
+    kubelet_csr_regex            = "^(${join("|", concat(local.controlplane_ips, var.physical_worker_ips))})$"
+    metallb_version              = var.metallb_version
+    metallb_ip_range             = var.metallb_ip_range
   })
 
   filename = "${path.module}/../ansible/group_vars/all.yml"

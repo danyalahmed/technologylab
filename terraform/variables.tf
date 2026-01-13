@@ -51,11 +51,36 @@ variable "sudo_password" {
 variable "auto_run_ansible" {
   description = "Automatically run Ansible playbooks after infrastructure is created"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "ansible_ssh_key_path" {
   description = "Path to SSH private key for Ansible connections"
   type        = string
   default     = "~/.ssh/id_rsa"
+}
+
+variable "kubelet_csr_ip_prefixes" {
+  description = "IP prefixes to be included in kubelet CSR SANs"
+  type        = string
+  default     = ""
+
+}
+
+variable "desired_dns_servers" {
+  description = "List of desired DNS servers for the cluster nodes"
+  type        = list(string)
+  default     = [] 
+}
+
+variable "metallb_version" {
+  description = "Version of MetalLB to deploy"
+  type        = string
+  default     = ""
+}
+
+variable "metallb_ip_range" {
+  description = "IP range for MetalLB to allocate from e.g. 192.168.1.50-192.168.1.60"
+  type        = string
+  default     = ""
 }
