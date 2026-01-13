@@ -3,7 +3,7 @@
 # ============================================================================
 
 output "controlplane_vms" {
-  description = "Control plane VM details"
+  description = "Proxmox control plane VM details"
   value = {
     for name, vm in module.kubernetes_controlplane_vms : name => {
       ip    = vm.ip
@@ -14,32 +14,29 @@ output "controlplane_vms" {
   }
 }
 
-output "all_controlplane_ips" {
-  description = "All control plane IPs (Proxmox VMs + physical servers)"
-  value = [
-    for ip in concat(
-      [for _, m in module.kubernetes_controlplane_vms : m.ip],
-      var.physical_controlplane_ips
-    ) : ip if ip != null
-  ]
+output "controlplane_ips" {
+  description = "All control plane IP addresses (VMs + physical servers)"
+  value       = local.controlplane_ips
 }
 
 output "worker_ips" {
-  description = "All worker node IPs"
+  description = "All worker node IP addresses"
   value       = var.physical_worker_ips
 }
 
 # ============================================================================
-# VERSION INFORMATION
+# COMPONENT VERSIONS
 # ============================================================================
 
-output "versions" {
+output "component_versions" {
   description = "Deployed component versions"
   value = {
-    kubernetes      = local.kubernetes_version
-    calico          = local.calico_version
-    ubuntu_template = local.ubuntu_template_name
-    pod_cidr        = local.pod_network_cidr
+    kubernetes       = local.kubernetes_version
+    calico_cni       = local.calico_version
+    argocd           = local.argocd_version
+    metallb          = var.metallb_version
+    ubuntu_template  = local.ubuntu_template_name
+    pod_network_cidr = local.pod_network_cidr
   }
 }
 
@@ -57,12 +54,11 @@ output "ansible_vars_path" {
   value       = local_file.ansible_vars.filename
 }
 
-output "ansible_automation" {
-  description = "Ansible automation status"
+output "ansible_automation_status" {
+  description = "Ansible automation configuration status"
   value = {
-    auto_run_enabled = var.auto_run_ansible
-    prepare_nodes    = var.auto_run_ansible ? "Completed automatically" : "Run manually: cd ../ansible && ansible-playbook -i hosts.ini playbooks/prepare-nodes.yml"
-    init_cluster     = var.auto_run_ansible ? "Completed automatically" : "Run manually: cd ../ansible && ansible-playbook -i hosts.ini playbooks/kubeadm-init.yml"
+    enabled             = var.auto_run_ansible
+    manual_instructions = var.auto_run_ansible ? null : "Run playbooks manually: cd ../ansible && ansible-playbook -i hosts.ini playbooks/<playbook-name>.yml"
   }
 }
 
@@ -70,34 +66,71 @@ output "ansible_automation" {
 # NEXT STEPS
 # ============================================================================
 
+output "next_steps" {
+  description = "Post-deployment instructions"
+  value = var.auto_run_ansible ? local.next_steps_automated : local.next_steps_manual
+}
+
 locals {
-  next_steps_auto = <<-EOT
+  next_steps_automated = <<-EOT
     ✅ Infrastructure and Kubernetes cluster deployed successfully!
 
-    Next steps:
-    1. Verify cluster: kubectl get nodes
-    2. Check pods: kubectl get pods --all-namespaces
-    3. Access cluster: Use kubeconfig from control plane at ~/.kube/config
+    Cluster Information:
+    - Control Plane IPs: ${join(", ", local.controlplane_ips)}
+    - Worker IPs: ${join(", ", var.physical_worker_ips)}
 
-    Control Plane IPs: ${join(", ", [for ip in concat([for _, m in module.kubernetes_controlplane_vms : m.ip], var.physical_controlplane_ips) : ip if ip != null])}
-    Worker IPs: ${join(", ", var.physical_worker_ips)}
-
-    Versions deployed:
+    Component Versions:
     - Kubernetes: ${local.kubernetes_version}
     - Calico CNI: ${local.calico_version}
+    - ArgoCD: ${local.argocd_version}
+    - MetalLB: ${var.metallb_version}
 
-    To upgrade versions, edit terraform/versions.tf and run 'terraform apply'
+    Next Steps:
+    1. Verify cluster health:
+       kubectl get nodes
+       kubectl get pods --all-namespaces
+
+    2. Access ArgoCD UI:
+       kubectl port-forward svc/argocd-server -n argocd 8080:443
+       Username: admin
+       Password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+
+    3. Copy kubeconfig from control plane:
+       scp ${element(local.controlplane_ips, 0)}:~/.kube/config ~/.kube/config
+
+    To upgrade versions, edit terraform/locals.tf and run 'terraform apply'
   EOT
 
   next_steps_manual = <<-EOT
     ✅ Infrastructure deployed successfully!
 
-    Next steps (Ansible automation is disabled):
-    1. Prepare nodes: cd ../ansible && ansible-playbook -i hosts.ini playbooks/prepare-nodes.yml --ask-become-pass
-    2. Initialize cluster: cd ../ansible && ansible-playbook -i hosts.ini playbooks/kubeadm-init.yml --ask-become-pass
-    3. Verify cluster: kubectl get nodes
+    Cluster Information:
+    - Control Plane IPs: ${join(", ", local.controlplane_ips)}
+    - Worker IPs: ${join(", ", var.physical_worker_ips)}
 
-    Control Plane IPs: ${join(", ", [for ip in concat([for _, m in module.kubernetes_controlplane_vms : m.ip], var.physical_controlplane_ips) : ip if ip != null])}
+    Next Steps (Manual Ansible execution required):
+    1. Install Python dependencies:
+       cd ../ansible && ansible-playbook -i hosts.ini playbooks/00-install-python-deps.yml
+
+    2. Prepare nodes:
+       ansible-playbook -i hosts.ini playbooks/01-prepare-nodes.yml
+
+    3. Initialize control plane:
+       ansible-playbook -i hosts.ini playbooks/02-init-controlplane.yml
+
+    4. Join worker nodes:
+       ansible-playbook -i hosts.ini playbooks/03-join-workers.yml
+
+    5. Bootstrap ArgoCD:
+       ansible-playbook -i hosts.ini playbooks/04-bootstrap-argocd.yml
+
+    6. Verify cluster:
+       kubectl get nodes
+
+    To enable automatic Ansible execution, set auto_run_ansible = true in terraform.auto.tfvars
+  EOT
+}
+
     Worker IPs: ${join(", ", var.physical_worker_ips)}
 
     To enable automatic Ansible execution, set 'auto_run_ansible = true' in terraform.auto.tfvars
