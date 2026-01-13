@@ -22,10 +22,11 @@ resource "null_resource" "wait_for_vms" {
 }
 
 # ============================================================================
-# PLAYBOOK 1: Install Python Dependencies
+# ANSIBLE PLAYBOOK EXECUTION
 # ============================================================================
 
-resource "null_resource" "ansible_install_python" {
+# Prerequisites playbook
+resource "null_resource" "ansible_prerequisites" {
   count = var.auto_run_ansible ? 1 : 0
 
   depends_on = [null_resource.wait_for_vms]
@@ -38,21 +39,18 @@ resource "null_resource" "ansible_install_python" {
     command = <<-EOT
       cd ${path.module}/../ansible
       echo "\n=== Installing Python dependencies on all nodes ==="
-      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/00-install-python-deps.yml \
+      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/prerequisites.yml \
         --private-key=${var.ansible_ssh_key_path} \
         ${var.sudo_password != "" ? "-e ansible_become_password=${var.sudo_password}" : ""}
     EOT
   }
 }
 
-# ============================================================================
-# PLAYBOOK 2: Prepare Kubernetes Nodes
-# ============================================================================
-
-resource "null_resource" "ansible_prepare_nodes" {
+# Configure nodes playbook
+resource "null_resource" "ansible_configure_nodes" {
   count = var.auto_run_ansible ? 1 : 0
 
-  depends_on = [null_resource.ansible_install_python]
+  depends_on = [null_resource.ansible_prerequisites]
 
   triggers = {
     kubernetes_version = local.kubernetes_version
@@ -64,76 +62,86 @@ resource "null_resource" "ansible_prepare_nodes" {
     command = <<-EOT
       cd ${path.module}/../ansible
       echo "\n=== Preparing Kubernetes nodes ==="
-      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/01-prepare-nodes.yml \
+      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/configure-nodes.yml \
         --private-key=${var.ansible_ssh_key_path} \
         ${var.sudo_password != "" ? "-e ansible_become_password=${var.sudo_password}" : ""}
     EOT
   }
 }
 
-# ============================================================================
-# PLAYBOOK 3: Initialize Control Plane
-# ============================================================================
-
-resource "null_resource" "ansible_init_cluster" {
+# Initialize control plane playbook
+resource "null_resource" "ansible_initialize_control_plane" {
   count = var.auto_run_ansible ? 1 : 0
 
-  depends_on = [null_resource.ansible_prepare_nodes]
+  depends_on = [null_resource.ansible_configure_nodes]
 
   triggers = {
     kubernetes_version = local.kubernetes_version
     calico_version     = local.calico_version
-    prepare_nodes_id   = null_resource.ansible_prepare_nodes[0].id
   }
 
   provisioner "local-exec" {
     command = <<-EOT
       cd ${path.module}/../ansible
       echo "\n=== Initializing Kubernetes control plane ==="
-      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/02-init-controlplane.yml \
+      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/initialize-control-plane.yml \
         --private-key=${var.ansible_ssh_key_path} \
         ${var.sudo_password != "" ? "-e ansible_become_password=${var.sudo_password}" : ""}
     EOT
   }
 }
 
-# ============================================================================
-# PLAYBOOK 4: Join Worker Nodes
-# ============================================================================
-
-resource "null_resource" "ansible_join_workers" {
+# Join worker nodes playbook
+resource "null_resource" "ansible_join_worker_nodes" {
   count = var.auto_run_ansible ? 1 : 0
 
-  depends_on = [null_resource.ansible_init_cluster]
+  depends_on = [null_resource.ansible_initialize_control_plane]
 
   triggers = {
     kubernetes_version = local.kubernetes_version
-    init_cluster_id    = null_resource.ansible_init_cluster[0].id
   }
 
   provisioner "local-exec" {
     command = <<-EOT
       cd ${path.module}/../ansible
       echo "\n=== Joining worker nodes to Kubernetes cluster ==="
-      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/03-join-workers.yml \
+      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/join-worker-nodes.yml \
         --private-key=${var.ansible_ssh_key_path} \
         ${var.sudo_password != "" ? "-e ansible_become_password=${var.sudo_password}" : ""}
     EOT
   }
 }
 
-# ============================================================================
-# PLAYBOOK 5: Bootstrap ArgoCD
-# ============================================================================
-
-resource "null_resource" "ansible_setup_argocd" {
+# Deploy MetalLB playbook
+resource "null_resource" "ansible_deploy_metallb" {
   count = var.auto_run_ansible ? 1 : 0
 
-  depends_on = [null_resource.ansible_init_cluster]
+  depends_on = [null_resource.ansible_join_worker_nodes]
 
   triggers = {
     kubernetes_version = local.kubernetes_version
-    init_cluster_id    = null_resource.ansible_init_cluster[0].id
+    metallb_version    = var.metallb_version
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      cd ${path.module}/../ansible
+      echo "\n=== Bootstrapping MetalLB ==="
+      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/deploy-metallb.yml \
+        --private-key=${var.ansible_ssh_key_path} \
+        ${var.sudo_password != "" ? "-e ansible_become_password=${var.sudo_password}" : ""}
+    EOT
+  }
+}
+
+# Deploy ArgoCD playbook
+resource "null_resource" "ansible_deploy_argocd" {
+  count = var.auto_run_ansible ? 1 : 0
+
+  depends_on = [null_resource.ansible_deploy_metallb]
+
+  triggers = {
+    kubernetes_version = local.kubernetes_version
     argocd_version     = local.argocd_version
   }
 
@@ -141,7 +149,7 @@ resource "null_resource" "ansible_setup_argocd" {
     command = <<-EOT
       cd ${path.module}/../ansible
       echo "\n=== Bootstrapping ArgoCD ==="
-      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/04-bootstrap-argocd.yml \
+      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini playbooks/deploy-argocd.yml \
         --private-key=${var.ansible_ssh_key_path} \
         ${var.sudo_password != "" ? "-e ansible_become_password=${var.sudo_password}" : ""}
     EOT

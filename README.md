@@ -93,11 +93,12 @@ make apply
 **With `auto_run_ansible = true`**, this command:
 1. ✅ Creates VMs on Proxmox
 2. ✅ Generates Ansible inventory and variables
-3. ✅ Installs dependencies on nodes
-4. ✅ Prepares nodes (firewall, containerd, k8s)
-5. ✅ Initializes control plane
-6. ✅ Joins worker nodes
-7. ✅ Bootstraps ArgoCD
+3. ✅ Installs prerequisites (Python dependencies)
+4. ✅ Configures nodes (firewall, containerd, k8s)
+5. ✅ Initializes control plane (kubeadm, CNI)
+6. ✅ Joins worker nodes to cluster
+7. ✅ Deploys MetalLB for LoadBalancer services
+8. ✅ Deploys ArgoCD for GitOps
 
 ### 3. Verify Deployment
 

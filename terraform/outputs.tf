@@ -68,7 +68,7 @@ output "ansible_automation_status" {
 
 output "next_steps" {
   description = "Post-deployment instructions"
-  value = var.auto_run_ansible ? local.next_steps_automated : local.next_steps_manual
+  value       = var.auto_run_ansible ? local.next_steps_automated : local.next_steps_manual
 }
 
 locals {
@@ -129,15 +129,4 @@ locals {
 
     To enable automatic Ansible execution, set auto_run_ansible = true in terraform.auto.tfvars
   EOT
-}
-
-    Worker IPs: ${join(", ", var.physical_worker_ips)}
-
-    To enable automatic Ansible execution, set 'auto_run_ansible = true' in terraform.auto.tfvars
-  EOT
-}
-
-output "next_steps" {
-  description = "What to do next"
-  value       = var.auto_run_ansible ? local.next_steps_auto : local.next_steps_manual
 }

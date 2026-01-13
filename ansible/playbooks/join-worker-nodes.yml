@@ -9,11 +9,11 @@
 #   2. Execute join command on worker nodes
 #
 # Prerequisites:
-#   - Control plane must be initialized (playbook 02)
-#   - Worker nodes must be prepared (playbook 01)
+#   - Control plane must be initialized (initialize-control-plane.yml)
+#   - Worker nodes must be configured (configure-nodes.yml)
 #
 # Usage:
-#   ansible-playbook -i hosts.ini playbooks/03-join-workers.yml
+#   ansible-playbook -i hosts.ini playbooks/join-worker-nodes.yml
 # ============================================================================
 
 - name: Join Kubernetes Worker Nodes to Control Plane

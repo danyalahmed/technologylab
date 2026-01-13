@@ -1,6 +1,6 @@
 ---
 # ============================================================================
-# PREPARE KUBERNETES NODES
+# CONFIGURE KUBERNETES NODES
 # ============================================================================
 # This playbook prepares all nodes (control plane and workers) for Kubernetes.
 # It configures firewall, system settings, container runtime, and installs
@@ -14,7 +14,7 @@
 #   - networking: Apply network fixes for Calico VXLAN
 #
 # Usage:
-#   ansible-playbook -i hosts.ini playbooks/01-prepare-nodes.yml
+#   ansible-playbook -i hosts.ini playbooks/configure-nodes.yml
 # ============================================================================
 
 - name: Prepare Nodes for Kubernetes

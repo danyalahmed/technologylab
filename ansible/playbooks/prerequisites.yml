@@ -1,8 +1,8 @@
 ---
 # ============================================================================
-# INSTALL PYTHON DEPENDENCIES
+# PREREQUISITES
 # ============================================================================
-# This playbook installs Python and required packages on control plane nodes.
+# This playbook installs Python and required packages on all nodes.
 # These packages are needed for Ansible Kubernetes modules.
 #
 # Installed packages:
@@ -12,11 +12,11 @@
 #   - ethtool: Network interface configuration tool
 #
 # Usage:
-#   ansible-playbook -i hosts.ini playbooks/00-install-python-deps.yml
+#   ansible-playbook -i hosts.ini playbooks/prerequisites.yml
 # ============================================================================
 
 - name: Install Python Dependencies
-  hosts: controlplane
+  hosts: all
   become: true
   tasks:
     - name: Update apt cache

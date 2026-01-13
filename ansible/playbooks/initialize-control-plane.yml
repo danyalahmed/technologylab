@@ -11,17 +11,16 @@
 #   4. Manually approve initial kubelet CSRs
 #   5. Install Calico CNI with Tigera operator
 #   6. Deploy kubelet-csr-approver for automatic CSR approval
-#   7. Deploy MetalLB for LoadBalancer services
 #
 # Prerequisites:
-#   - All nodes must be prepared (playbook 01)
+#   - All nodes must be configured (configure-nodes.yml)
 #
 # Post-initialization:
 #   - Kubeconfig is available at ~/.kube/config on control plane
 #   - Kubeconfig is fetched to ansible/playbooks/temp_kubeconfig
 #
 # Usage:
-#   ansible-playbook -i hosts.ini playbooks/02-init-controlplane.yml
+#   ansible-playbook -i hosts.ini playbooks/initialize-control-plane.yml
 # ============================================================================
 
 - name: Initialize Kubernetes Control Plane
@@ -115,18 +114,37 @@
 
     - name: Install Calico with Tigera Operator
       become: false
-      ansible.builtin.shell: |
-        set -o pipefail
-        kubectl create namespace calico-system --dry-run=client -o yaml | kubectl apply -f -
-        kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/tigera-operator.yaml
-        sleep 5
-
-        # Patch CIDR, and Apply Custom Resources
-        curl -sL https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/custom-resources.yaml | \
-        sed 's|192.168.0.0/16|{{ pod_network_cidr }}|g' | \
-        kubectl apply -f -
+      kubernetes.core.k8s:
+        state: present
+        src: https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/tigera-operator.yaml
+    - name: Wait for Tigera Operator to be ready
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: tigera-operator
+        name: tigera-operator
+      register: tigera_operator_deploy
+      until: tigera_operator_deploy.resources[0].status.availableReplicas | default(0) >= 1
+      retries: 10
+      delay: 15
+      become: false
+    - name: Get Calico Custom Resources manifest
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/custom-resources.yaml
+        dest: /tmp/calico-custom-resources.yaml
+        mode: '0644'
       changed_when: false
-
+      become: false
+    - name: Patch Pod Network CIDR in Calico Custom Resources
+      ansible.builtin.replace:
+        path: /tmp/calico-custom-resources.yaml
+        regexp: '192\.168\.0\.0/16'
+        replace: "{{ pod_network_cidr }}"
+      become: false
+    - name: Apply Calico Custom Resources
+      kubernetes.core.k8s:
+        state: present
+        src: /tmp/calico-custom-resources.yaml
+      become: false
     - name: Fetch kubeconfig to local machine
       ansible.builtin.fetch:
         src: /etc/kubernetes/admin.conf
@@ -134,7 +152,6 @@
         flat: true # Keeps it from creating a deep directory structure
       become: true
       when: kube_init_check.stat.exists
-
     - name: Add kubelet-csr-approver chart repo
       ansible.builtin.shell: |
         helm repo add kubelet-csr-approver https://postfinance.github.io/kubelet-csr-approver
@@ -172,44 +189,3 @@
       changed_when: false
       # This ensures Ansible doesn't try to run this if the Master init failed
       when: kube_init_check is defined
-    - name: Ensure MetalLB namespace exists
-      kubernetes.core.k8s:
-        api_version: v1
-        kind: Namespace
-        name: metallb-system
-        state: present
-      become: false
-
-    - name: Apply MetalLB manifests
-      kubernetes.core.k8s:
-        state: present
-        src: "https://raw.githubusercontent.com/metallb/metallb/{{ metallb_version }}/config/manifests/metallb-native.yaml"
-      become: false
-
-    - name: Configure MetalLB IPAddressPool
-      kubernetes.core.k8s:
-        definition:
-          apiVersion: metallb.io/v1beta1
-          kind: IPAddressPool
-          metadata:
-            namespace: metallb-system
-            name: metallb-ip-pool
-          spec:
-            addresses:
-              - "{{ metallb_ip_range }}"
-        state: present
-      become: false
-
-    - name: Configure MetalLB L2Advertisement
-      kubernetes.core.k8s:
-        definition:
-          apiVersion: metallb.io/v1beta1
-          kind: L2Advertisement
-          metadata:
-            namespace: metallb-system
-            name: metallb-l2-advertisement
-          spec:
-            ipAddressPools:
-              - metallb-ip-pool
-        state: present
-      become: false

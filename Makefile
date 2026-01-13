@@ -58,22 +58,25 @@ ansible-inventory: ## Display generated Ansible inventory
 # MANUAL ANSIBLE PLAYBOOK EXECUTION
 # ============================================================================
 
-ansible-python: ## Install Python dependencies on nodes
-	cd ansible && ansible-playbook -i hosts.ini playbooks/00-install-python-deps.yml
+ansible-prerequisites: ## Install Python dependencies on nodes
+	cd ansible && ansible-playbook -i hosts.ini playbooks/prerequisites.yml
 
-ansible-prepare: ## Prepare Kubernetes nodes
-	cd ansible && ansible-playbook -i hosts.ini playbooks/01-prepare-nodes.yml
+ansible-configure: ## Configure Kubernetes nodes
+	cd ansible && ansible-playbook -i hosts.ini playbooks/configure-nodes.yml
 
 ansible-init: ## Initialize Kubernetes control plane
-	cd ansible && ansible-playbook -i hosts.ini playbooks/02-init-controlplane.yml
+	cd ansible && ansible-playbook -i hosts.ini playbooks/initialize-control-plane.yml
 
 ansible-join: ## Join worker nodes to cluster
-	cd ansible && ansible-playbook -i hosts.ini playbooks/03-join-workers.yml
+	cd ansible && ansible-playbook -i hosts.ini playbooks/join-worker-nodes.yml
 
-ansible-argocd: ## Bootstrap ArgoCD
-	cd ansible && ansible-playbook -i hosts.ini playbooks/04-bootstrap-argocd.yml
+ansible-metallb: ## Deploy MetalLB
+	cd ansible && ansible-playbook -i hosts.ini playbooks/deploy-metallb.yml
 
-ansible-all: ansible-python ansible-prepare ansible-init ansible-join ansible-argocd ## Run all Ansible playbooks in sequence
+ansible-argocd: ## Deploy ArgoCD
+	cd ansible && ansible-playbook -i hosts.ini playbooks/deploy-argocd.yml
+
+ansible-all: ansible-prerequisites ansible-configure ansible-init ansible-join ansible-metallb ansible-argocd ## Run all Ansible playbooks in sequence
 
 # ============================================================================
 # CLUSTER OPERATIONS
