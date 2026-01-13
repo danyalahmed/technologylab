@@ -1,7 +1,7 @@
 ---
 - name: Bootstrap ArgoCD
   hosts: controlplane
-  become: no  # Run as 'danny' so it uses ~/.kube/config
+  become: false  # Run as 'danny' so it uses ~/.kube/config
   vars:
     git_org_url: "git@github.com:danyalahmed/technologylab.git"
 

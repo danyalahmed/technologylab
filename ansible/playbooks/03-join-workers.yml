@@ -1,34 +1,37 @@
 ---
 - name: Join Kubernetes Worker Nodes to Control Plane
   hosts: controlplane
-  become: yes
+  become: true
   tasks:
     - name: Generate join command for worker nodes
       delegate_to: "{{ groups['controlplane'][0] }}"
-      command: kubeadm token create --print-join-command
+      ansible.builtin.command:
+        cmd: kubeadm token create --print-join-command
       register: kube_join_cmd
+      changed_when: false
 
     - name: Set join command fact
       delegate_to: "{{ groups['controlplane'][0] }}"
-      set_fact:
+      ansible.builtin.set_fact:
         kube_join_cmd: "{{ kube_join_cmd.stdout }}"
 
 - name: Join worker nodes to the Kubernetes cluster
   hosts: workers
-  become: yes
+  become: true
   tasks:
     - name: Ensure join command exists
-      fail:
+      ansible.builtin.fail:
         msg: "Join command not available on control plane host {{ groups['controlplane'][0] }}"
       when: hostvars[groups['controlplane'][0]].kube_join_cmd is not defined
 
     - name: Check if node is already joined
-      stat:
+      ansible.builtin.stat:
         path: /etc/kubernetes/kubelet.conf
       register: node_joined
 
     - name: Join the node to the Kubernetes cluster
-      command: "{{ hostvars[groups['controlplane'][0]].kube_join_cmd }} --node-name={{ inventory_hostname }}"
+      ansible.builtin.command:
+        cmd: "{{ hostvars[groups['controlplane'][0]].kube_join_cmd }} --node-name={{ inventory_hostname }}"
       args:
         creates: /etc/kubernetes/kubelet.conf
       when: not node_joined.stat.exists

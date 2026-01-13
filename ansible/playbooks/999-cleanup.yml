@@ -1,0 +1,75 @@
+---
+- name: Safe Kubernetes Removal
+  hosts: all
+  become: true
+  vars:
+    # We only target K8s-specific interfaces to avoid touching eth0/ens
+    k8s_interfaces:
+      - cni0
+      - tunl0
+      - vxlan.calico
+      - istio-proxy
+      - istioin
+      - istioout
+
+  tasks:
+    - name: 1. Graceful Kubeadm Reset
+      ansible.builtin.command:
+        cmd: kubeadm reset -f
+      failed_when: false
+      changed_when: false
+
+    - name: 2. Stop Services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+      loop:
+        - kubelet
+        - containerd
+      failed_when: false
+
+    - name: 3. Unmount K8s Filesystems (The Safety Step)
+      ansible.builtin.shell: |
+        set -o pipefail
+        # This finds only K8s/Calico/CSI mounts and unmounts them safely
+        for mount in $(mount | grep -E 'kubelet|calico|plugins' | awk '{print $3}'); do
+          umount -l $mount
+        done
+      failed_when: false
+      changed_when: false
+
+    - name: 4. Clean Network Interfaces
+      ansible.builtin.shell: "ip link delete {{ item }} || true"
+      loop: "{{ k8s_interfaces }}"
+      changed_when: false
+
+    - name: 5. Reset Firewall (Keeps SSH open)
+      ansible.builtin.shell: |
+        # Resetting UFW to default 'allow' for SSH safety
+        ufw --force reset
+        ufw default allow incoming
+        # Flush K8s specific chains but keep standard iptables structure
+        iptables -F
+        iptables -t nat -F
+        iptables -t mangle -F
+        iptables -X
+      failed_when: false
+      changed_when: false
+
+    - name: 6. Selective Directory Removal
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/kubernetes
+        - /var/lib/kubelet
+        - /var/lib/etcd
+        - /var/lib/cni
+        - /etc/cni/net.d
+        - /var/run/calico
+        - /opt/cni/bin
+
+    - name: 7. Restart Containerd (Ready for next run)
+      ansible.builtin.systemd:
+        name: containerd
+        state: started

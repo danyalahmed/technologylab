@@ -1,16 +1,16 @@
 ---
 - name: Prepare Nodes for Kubernetes
   hosts: k8s_nodes
-  become: yes
-  become_method: sudo
+  become: true
+  become_method: ansible.builtin.sudo
   tasks:
     - name: Allow SSH
-      ufw:
+      community.general.ufw:
         rule: allow
         name: OpenSSH
 
     - name: Open Controlplane Ports
-      ufw:
+      community.general.ufw:
         rule: allow
         port: "{{ item }}"
         proto: tcp
@@ -23,7 +23,7 @@
       when: "'controlplane' in group_names"
 
     - name: Open Worker Node TCP Ports
-      ufw:
+      community.general.ufw:
         rule: allow
         port: "{{ item }}"
         proto: tcp
@@ -34,7 +34,7 @@
       when: "'workers' in group_names"
 
     - name: Open Worker Node UDP Ports
-      ufw:
+      community.general.ufw:
         rule: allow
         port: "{{ item }}"
         proto: udp
@@ -42,129 +42,188 @@
         - 30000:32767  # NodePort Services
       when: "'workers' in group_names"
 
-    - name: Allow Routed Traffic
-      command: ufw default allow routed
-
-    - name: Allow Calico BGP
+    - name: Ports for Pod Networking (Calico)
       community.general.ufw:
         rule: allow
-        port: '179'
-        proto: tcp
+        port: "{{ item.port }}"
+        proto: "{{ item.proto }}"
+      loop:
+        - { port: '4789', proto: 'udp' }   # VXLAN
+        - { port: '5473', proto: 'tcp' }   # Calico Typha
+        - { port: '179', proto: 'tcp' }    # BGP
+
+    - name: Allow Routed Traffic
+      ansible.builtin.command:
+        cmd: ufw default allow routed
+      changed_when: false
 
     - name: Enable UFW
-      ufw:
+      community.general.ufw:
         state: enabled
         policy: deny
 
     - name: Enable IP Masquerade for Pod Network in UFW
-      blockinfile:
+      ansible.builtin.blockinfile:
         path: /etc/ufw/before.rules
         insertbefore: BOF
         block: |
           *nat
           :POSTROUTING ACCEPT [0:0]
-          -A POSTROUTING -s 192.168.0.0/16 -o {{ ansible_default_ipv4.interface }} -j MASQUERADE
+          -A POSTROUTING -s {{ pod_network_cidr }} -o {{ ansible_facts['default_ipv4']['interface'] }} -j MASQUERADE
           COMMIT
       notify: Reload UFW
 
     - name: Disable Swap
-      command: swapoff -a
+      ansible.builtin.command:
+        cmd: swapoff -a
       when: ansible_facts['swaptotal_mb'] > 0
+      changed_when: ansible_facts['swaptotal_mb'] > 0
 
     - name: Remove Swap Entry from fstab
-      mount:
+      ansible.posix.mount:
         name: none
         fstype: swap
         state: absent
       when: ansible_facts['swaptotal_mb'] > 0
 
     - name: Load required kernel modules
-      modprobe:
+      community.general.modprobe:
         name: "{{ item }}"
         state: present
-      loop: [ 'overlay', 'br_netfilter' ]
+      loop:
+        - overlay
+        - br_netfilter
 
     - name: Persist kernel modules on boot
-      copy:
+      ansible.builtin.copy:
         dest: /etc/modules-load.d/k8s.conf
         content: |
           overlay
           br_netfilter
+        owner: root
+        group: root
+        mode: '0644'
 
     - name: Enable IPv4 forwarding and Bridge traffic
-      sysctl:
+      ansible.posix.sysctl:
         name: "{{ item.key }}"
         value: "{{ item.value }}"
         state: present
-        sysctl_set: yes
-        reload: yes
+        sysctl_set: true
+        reload: true
       loop:
         - { key: 'net.bridge.bridge-nf-call-iptables', value: '1' }
         - { key: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
         - { key: 'net.ipv4.ip_forward', value: '1' }
 
     - name: Install Containerd
-      apt:
+      ansible.builtin.apt:
         name: containerd
         state: present
 
     - name: Create Containerd directory
-      file:
+      ansible.builtin.file:
         path: /etc/containerd
         state: directory
+        owner: root
+        group: root
+        mode: '0755'
 
     - name: Generate default containerd config
-      shell: containerd config default > /etc/containerd/config.toml
+      ansible.builtin.shell: containerd config default > /etc/containerd/config.toml
       args:
         creates: /etc/containerd/config.toml
 
     - name: Set SystemdCgroup to true
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: /etc/containerd/config.toml
         regexp: 'SystemdCgroup = false'
         line: '            SystemdCgroup = true'
         state: present
 
     - name: Restart Containerd
-      service:
+      ansible.builtin.service:
         name: containerd
         state: restarted
-        enabled: yes
+        enabled: true
 
     - name: Install dependencies for K8s
-      apt:
-        name: [ 'apt-transport-https', 'ca-certificates', 'curl', 'gpg' ]
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gpg
         state: present
 
     - name: Create directory for K8s keyring
-      file:
+      ansible.builtin.file:
         path: /etc/apt/keyrings
         state: directory
+        owner: root
+        group: root
         mode: '0755'
 
     - name: Download Kubernetes GPG key
-      get_url:
-        url: "https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/deb/Release.key"
+      ansible.builtin.get_url:
+        url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version_short }}/deb/Release.key"
         dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
         mode: '0644'
 
     - name: Add Kubernetes repository
-      apt_repository:
-        repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/deb/ /"
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version_short }}/deb/ /"
         state: present
         filename: kubernetes
 
     - name: Install Kubeadm, Kubelet, and Kubectl
-      apt:
-        name: [ 'kubelet', 'kubeadm', 'kubectl' ]
+      ansible.builtin.apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
         state: present
-        update_cache: yes
+        update_cache: true
 
     - name: Hold Kubernetes packages at current version
-      dpkg_selections:
+      ansible.builtin.dpkg_selections:
         name: "{{ item }}"
         selection: hold
-      loop: [ 'kubelet', 'kubeadm', 'kubectl' ]
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+    # disable TX checksum offloading to fix Calico VXLAN networking issues
+    - name: Create permanent fix for checksum offloading
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/k8s-net-fix.service
+        mode: '0644'
+        owner: root
+        group: root
+        content: |
+          [Unit]
+          Description=Disable TX Checksum Offload for Calico VXLAN
+          After=network-online.target
+
+          [Service]
+          Type=oneshot
+          # We use '' for the shell command to protect the $ from systemd
+          ExecStart=/bin/sh -c 'ethtool -K $(ip -4 addr show | grep "{{ ansible_host }}" | awk "{print \$NF}") tx off'
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+    - name: Enable services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop:
+        - k8s-net-fix.service
+        - containerd
+        - kubelet
   handlers:
     - name: Reload UFW
-      command: ufw reload
+      ansible.builtin.command:
+        cmd: ufw reload
+      changed_when: false
