@@ -80,6 +80,56 @@ ansible-playbook -i hosts.ini playbooks/prepare-nodes.yml --ask-become-pass
 ansible-playbook -i hosts.ini playbooks/kubeadm-init.yml --ask-become-pass
 ```
 
+## Access Headlamp UI (Port-forward + ServiceAccount token) 🔐
+
+Use the steps below to port-forward the Headlamp UI (service `svc/kubernetes-dashboard-headlamp`) and log in using a short-lived ServiceAccount token bound to `cluster-admin`. Replace `NAMESPACE` with the namespace where Headlamp is deployed (e.g., `kubernetes-dashboard`).
+
+1. Create a ServiceAccount and ClusterRoleBinding:
+
+```bash
+# Create ServiceAccount
+kubectl -n kubernetes-dashboard create serviceaccount headlamp-admin
+
+# Bind the ServiceAccount to cluster-admin
+kubectl create clusterrolebinding headlamp-admin-binding \
+  --clusterrole=cluster-admin \
+  --serviceaccount=kubernetes-dashboard:headlamp-admin
+```
+
+2. Retrieve a token for the ServiceAccount (recommended on Kubernetes >=1.24):
+
+```bash
+kubectl -n kubernetes-dashboard create token headlamp-admin
+```
+
+Fallback (older clusters):
+
+```bash
+SECRET=$(kubectl -n kubernetes-dashboard get sa headlamp-admin -o jsonpath='{.secrets[0].name}')
+kubectl -n kubernetes-dashboard get secret $SECRET -o go-template='{{.data.token | base64decode}}'
+```
+
+3. Port-forward the Headlamp service locally and open your browser:
+
+```bash
+kubectl -n kubernetes-dashboard port-forward svc/kubernetes-dashboard-headlamp 8080:80
+# Then open: http://localhost:8080
+```
+
+4. On the Headlamp login screen choose "Token" and paste the token from step 2.
+
+Security notes:
+
+- Binding `cluster-admin` grants full cluster privileges — remove the `ClusterRoleBinding` when finished:
+
+```bash
+kubectl delete clusterrolebinding headlamp-admin-binding
+kubectl -n kubernetes-dashboard delete sa headlamp-admin
+```
+
+- Prefer short-lived tokens or OIDC for production environments whenever possible.
+
+
 ## Upgrading
 
 All versions are in ONE place: `terraform/versions.tf`
