@@ -35,7 +35,7 @@ Applications are deployed in the following order using sync waves:
 
 The cluster is bootstrapped using the app-of-apps pattern:
 
-1. ArgoCD is installed via Ansible playbook `04-bootstrap-argocd.yml`
+1. ArgoCD is installed via Ansible playbook `deploy-argocd.yml`
 2. Root application (`bootstrap/apps.yml`) is applied
 3. Root app automatically deploys all applications in `apps/` directory
 4. Applications sync in order based on their sync wave annotations
