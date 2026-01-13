@@ -1,0 +1,44 @@
+---
+# System preparation for Kubernetes
+- name: Disable swap
+  ansible.builtin.command:
+    cmd: swapoff -a
+  when: ansible_facts['swaptotal_mb'] > 0
+  changed_when: ansible_facts['swaptotal_mb'] > 0
+
+- name: Remove swap entry from fstab
+  ansible.posix.mount:
+    name: none
+    fstype: swap
+    state: absent
+  when: ansible_facts['swaptotal_mb'] > 0
+
+- name: Load required kernel modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: Persist kernel modules on boot
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable IPv4 forwarding and bridge traffic
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_set: true
+    reload: true
+  loop:
+    - { key: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+    - { key: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+    - { key: 'net.ipv4.ip_forward', value: '1' }

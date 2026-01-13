@@ -1,4 +1,21 @@
 ---
+# ============================================================================
+# JOIN WORKER NODES TO KUBERNETES CLUSTER
+# ============================================================================
+# This playbook joins worker nodes to the Kubernetes cluster.
+#
+# Steps:
+#   1. Generate join command from control plane
+#   2. Execute join command on worker nodes
+#
+# Prerequisites:
+#   - Control plane must be initialized (playbook 02)
+#   - Worker nodes must be prepared (playbook 01)
+#
+# Usage:
+#   ansible-playbook -i hosts.ini playbooks/03-join-workers.yml
+# ============================================================================
+
 - name: Join Kubernetes Worker Nodes to Control Plane
   hosts: controlplane
   become: true

@@ -1,0 +1,27 @@
+---
+# Network fixes for Calico VXLAN
+- name: Create network fix systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/k8s-net-fix.service
+    mode: '0644'
+    owner: root
+    group: root
+    content: |
+      [Unit]
+      Description=Disable TX Checksum Offload for Calico VXLAN
+      After=network-online.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/bin/sh -c 'ethtool -K $(ip -4 addr show | grep "{{ ansible_host }}" | awk "{print \$NF}") tx off'
+      RemainAfterExit=yes
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable and start network fix service
+  ansible.builtin.systemd:
+    name: k8s-net-fix.service
+    enabled: true
+    state: started
+    daemon_reload: true

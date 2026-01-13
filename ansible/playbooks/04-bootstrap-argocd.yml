@@ -1,4 +1,28 @@
 ---
+# ============================================================================
+# BOOTSTRAP ARGOCD
+# ============================================================================
+# This playbook installs ArgoCD on the Kubernetes cluster and configures
+# the app-of-apps pattern for GitOps.
+#
+# Steps:
+#   1. Install ArgoCD in argocd namespace
+#   2. Wait for ArgoCD server to be ready
+#   3. Apply ArgoCD projects
+#   4. Apply root application (app-of-apps)
+#
+# Prerequisites:
+#   - Kubernetes cluster must be initialized
+#   - kubectl access must be configured
+#
+# Post-installation:
+#   - Get admin password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+#   - Port forward: kubectl port-forward svc/argocd-server -n argocd 8080:443
+#
+# Usage:
+#   ansible-playbook -i hosts.ini playbooks/04-bootstrap-argocd.yml
+# ============================================================================
+
 - name: Bootstrap ArgoCD
   hosts: controlplane
   become: false  # Run as 'danny' so it uses ~/.kube/config

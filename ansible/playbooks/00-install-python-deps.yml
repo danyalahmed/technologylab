@@ -1,4 +1,20 @@
 ---
+# ============================================================================
+# INSTALL PYTHON DEPENDENCIES
+# ============================================================================
+# This playbook installs Python and required packages on control plane nodes.
+# These packages are needed for Ansible Kubernetes modules.
+#
+# Installed packages:
+#   - python3, python3-pip, python3-venv: Python runtime and tools
+#   - python3-kubernetes: Kubernetes Python client
+#   - python3-yaml: YAML parsing library
+#   - ethtool: Network interface configuration tool
+#
+# Usage:
+#   ansible-playbook -i hosts.ini playbooks/00-install-python-deps.yml
+# ============================================================================
+
 - name: Install Python Dependencies
   hosts: controlplane
   become: true

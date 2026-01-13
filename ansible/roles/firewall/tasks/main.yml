@@ -1,0 +1,70 @@
+---
+# Firewall configuration for Kubernetes nodes
+- name: Allow SSH
+  community.general.ufw:
+    rule: allow
+    name: OpenSSH
+
+- name: Open control plane TCP ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - 6443         # Kubernetes API server
+    - 2379:2380    # etcd server client API
+    - 10250        # Kubelet API
+    - 10251        # kube-scheduler
+    - 10257        # kube-controller-manager
+  when: "'controlplane' in group_names"
+
+- name: Open worker node TCP ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - 10250        # Kubelet API
+    - 10256        # kube-proxy
+    - 30000:32767  # NodePort Services
+  when: "'workers' in group_names"
+
+- name: Open worker node UDP ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: udp
+  loop:
+    - 30000:32767  # NodePort Services
+  when: "'workers' in group_names"
+
+- name: Open ports for pod networking (Calico)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+  loop:
+    - { port: '4789', proto: 'udp' }   # VXLAN
+    - { port: '5473', proto: 'tcp' }   # Calico Typha
+    - { port: '179', proto: 'tcp' }    # BGP
+
+- name: Allow routed traffic
+  ansible.builtin.command:
+    cmd: ufw default allow routed
+  changed_when: false
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+    policy: deny
+
+- name: Enable IP masquerade for pod network in UFW
+  ansible.builtin.blockinfile:
+    path: /etc/ufw/before.rules
+    insertbefore: BOF
+    block: |
+      *nat
+      :POSTROUTING ACCEPT [0:0]
+      -A POSTROUTING -s {{ pod_network_cidr }} -o {{ ansible_facts['default_ipv4']['interface'] }} -j MASQUERADE
+      COMMIT
+  notify: Reload UFW

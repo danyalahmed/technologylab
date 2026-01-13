@@ -1,4 +1,29 @@
 ---
+# ============================================================================
+# INITIALIZE KUBERNETES CONTROL PLANE
+# ============================================================================
+# This playbook initializes the Kubernetes control plane on the first master node.
+#
+# Steps:
+#   1. Initialize kubeadm with custom configuration
+#   2. Configure kubectl for the ansible user
+#   3. Fix CoreDNS configuration for custom DNS servers
+#   4. Manually approve initial kubelet CSRs
+#   5. Install Calico CNI with Tigera operator
+#   6. Deploy kubelet-csr-approver for automatic CSR approval
+#   7. Deploy MetalLB for LoadBalancer services
+#
+# Prerequisites:
+#   - All nodes must be prepared (playbook 01)
+#
+# Post-initialization:
+#   - Kubeconfig is available at ~/.kube/config on control plane
+#   - Kubeconfig is fetched to ansible/playbooks/temp_kubeconfig
+#
+# Usage:
+#   ansible-playbook -i hosts.ini playbooks/02-init-controlplane.yml
+# ============================================================================
+
 - name: Initialize Kubernetes Control Plane
   hosts: controlplane
   become: true
@@ -41,11 +66,40 @@
         remote_src: true
         mode: '0644'
 
-    - name: Fix CoreDns config for dns resolution
-      ansible.builtin.shell: |
-        kubectl get cm -n kube-system coredns -o yaml | sed 's|forward . /etc/resolv.conf|forward . {{ desired_dns_servers }}|g' | kubectl apply -f -
-        kubectl rollout restart -n kube-system deployment/coredns
+    - name: Get CoreDNS ConfigMap
+      kubernetes.core.k8s_info:
+        kind: ConfigMap
+        name: coredns
+        namespace: kube-system
+      register: coredns_cm
       become: false
+
+    - name: Build desired Corefile
+      ansible.builtin.set_fact:
+        corefile_new: "{{ coredns_cm.resources[0].data.Corefile | replace('forward . /etc/resolv.conf', 'forward . ' ~ desired_dns_servers) }}"
+      become: false
+
+    - name: Update CoreDNS ConfigMap if different
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: coredns
+            namespace: kube-system
+          data:
+            Corefile: "{{ corefile_new }}"
+        state: present
+      when: coredns_cm.resources[0].data.Corefile != corefile_new
+      register: coredns_apply
+      become: false
+
+    - name: Restart CoreDNS deployment if config changed
+      ansible.builtin.shell: |
+        kubectl rollout restart -n kube-system deployment/coredns
+      when: coredns_apply is defined and coredns_apply.changed
+      become: false
+      changed_when: coredns_apply is defined and coredns_apply.changed
 
     # --- ONE-TIME MANUAL APPROVAL ---
     # This breaks the "identity loop" so the Kubelet can start the network
@@ -118,34 +172,44 @@
       changed_when: false
       # This ensures Ansible doesn't try to run this if the Master init failed
       when: kube_init_check is defined
-    - name: Deploy Metallb
+    - name: Ensure MetalLB namespace exists
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Namespace
+        name: metallb-system
+        state: present
       become: false
-      ansible.builtin.shell: |
-        set -o pipefail
-        kubectl create namespace metallb-system --dry-run=client -o yaml | kubectl apply -f -
-        kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/{{ metallb_version }}/config/manifests/metallb-native.yaml
-    - name: Configure Metallb IP Address Pool
-      become: false
-      ansible.builtin.shell: |
-        set -o pipefail
-        cat <<EOF | kubectl apply -f -
-        apiVersion: metallb.io/v1beta1
-        kind: IPAddressPool
-        metadata:
-          namespace: metallb-system
-          name: metallb-ip-pool
-        spec:
-          addresses:
-          - {{ metallb_ip_range }}
-        EOF
 
-        cat <<EOF | kubectl apply -f -
-        apiVersion: metallb.io/v1beta1
-        kind: L2Advertisement
-        metadata:
-          namespace: metallb-system
-          name: metallb-l2-advertisement
-        spec:
-          ipAddressPools:
-          - metallb-ip-pool
-        EOF
+    - name: Apply MetalLB manifests
+      kubernetes.core.k8s:
+        state: present
+        src: "https://raw.githubusercontent.com/metallb/metallb/{{ metallb_version }}/config/manifests/metallb-native.yaml"
+      become: false
+
+    - name: Configure MetalLB IPAddressPool
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: metallb.io/v1beta1
+          kind: IPAddressPool
+          metadata:
+            namespace: metallb-system
+            name: metallb-ip-pool
+          spec:
+            addresses:
+              - "{{ metallb_ip_range }}"
+        state: present
+      become: false
+
+    - name: Configure MetalLB L2Advertisement
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: metallb.io/v1beta1
+          kind: L2Advertisement
+          metadata:
+            namespace: metallb-system
+            name: metallb-l2-advertisement
+          spec:
+            ipAddressPools:
+              - metallb-ip-pool
+        state: present
+      become: false
