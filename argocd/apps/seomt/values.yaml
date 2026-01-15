@@ -32,11 +32,6 @@ readinessProbe:
     path: /healthz
     port: http
 
-volumes: 
-- name: seomt
-  persistentVolumeClaim:
-    claimName: seomt
-
 volumeMounts:
 - name: seomt
   mountPath: /app/wwwroot/uploads
@@ -44,6 +39,14 @@ volumeMounts:
 - name: seomt
   mountPath: /app/wwwroot/reports
   subPath: reports
+
+persistence:
+  - name: seomt
+    storageClass: nfs-client
+    accessModes:
+      - ReadWriteMany
+    size: 1Gi
+    mountPath: /data # Not used directly, but subPaths are used above
 
 env:
   - name: ASPNETCORE_ENVIRONMENT
