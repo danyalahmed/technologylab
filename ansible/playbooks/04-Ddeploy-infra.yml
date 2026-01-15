@@ -33,7 +33,7 @@
     - metric-server
     - metallb
     - cert-manager
-
+    - argocd
 
 # Network layer - Gateway API must be before Istio
 - name: Deploy Gateway API CRDs
