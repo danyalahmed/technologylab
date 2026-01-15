@@ -56,6 +56,7 @@ env:
 
 externalSecrets:
   enabled: true
+  secretStoreName: vault-secret-store
   secrets:
     - secretKey: DefaultConnection
       remoteRef:

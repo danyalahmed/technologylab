@@ -34,6 +34,7 @@
     - metallb
     - cert-manager
     - argocd
+    - external-secrets
 
 # Network layer - Gateway API must be before Istio
 - name: Deploy Gateway API CRDs
