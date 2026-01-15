@@ -40,6 +40,29 @@
         url: "{{ git_repo_url }}"
         sshPrivateKey: "{{ lookup('file', ansible_ssh_private_key_file) }}"
 
+- name: Enable Helm in Kustomize for ArgoCD
+  kubernetes.core.k8s_json_patch:
+    kind: ConfigMap
+    name: argocd-cm
+    namespace: argocd
+    patch:
+      - op: add
+        path: /data/kustomize.buildOptions
+        value: "--enable-helm"
+
+- name: Restart ArgoCD Repo Server to apply changes
+  kubernetes.core.k8s:
+    state: patched
+    kind: Deployment
+    name: argocd-repo-server
+    namespace: argocd
+    definition:
+      spec:
+        template:
+          metadata:
+            annotations:
+              kubectl.kubernetes.io/restartedAt: "{{ ansible_date_time.iso8601 }}"
+
 - name: Deploy ArgoCD Projects
   kubernetes.core.k8s:
     state: present
