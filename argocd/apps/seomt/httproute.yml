@@ -1,0 +1,15 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: seomt-http-route
+  namespace: seomt
+spec:
+  parentRefs:
+    - name: secure-gw
+      namespace: istio-system
+      sectionName: https
+  hostnames: ["seomt.technologylab.uk"]
+  rules:
+    - backendRefs:
+        - name: seomt
+          port: 8080
