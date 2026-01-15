@@ -5,6 +5,7 @@
     name: containerd
     state: present
     update_cache: true
+    cache_valid_time: 3600
 
 - name: Create containerd directory
   ansible.builtin.file:
@@ -14,10 +15,16 @@
     group: root
     mode: '0755'
 
+- name: Check if containerd config exists
+  ansible.builtin.stat:
+    path: /etc/containerd/config.toml
+  register: containerd_config
+
 - name: Generate default containerd config
   ansible.builtin.shell: containerd config default > /etc/containerd/config.toml
   args:
     creates: /etc/containerd/config.toml
+  when: not containerd_config.stat.exists
 
 - name: Enable SystemdCgroup in containerd
   ansible.builtin.lineinfile:

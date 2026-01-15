@@ -1,18 +1,61 @@
 ---
-- name: Deploy infrastructure on Kubernetes
+# Base infrastructure - no dependencies
+- name: Deploy base infrastructure
   hosts: localhost
   connection: local
   become: false
   vars:
     ansible_python_interpreter: "{{ playbook_dir }}/../../.venv/bin/python"
-
   roles:
     - metric-server
+    - metallb
+    - cert-manager
+
+
+# Network layer - Gateway API must be before Istio
+- name: Deploy Gateway API CRDs
+  hosts: localhost
+  connection: local
+  become: false
+  vars:
+    ansible_python_interpreter: "{{ playbook_dir }}/../../.venv/bin/python"
+  roles:
     - gateway-api
+
+- name: Deploy Istio and gateways
+  hosts: localhost
+  connection: local
+  become: false
+  vars:
+    ansible_python_interpreter: "{{ playbook_dir }}/../../.venv/bin/python"
+  roles:
     - istio
     - default-gateways
+
+# Storage layer - sequential dependencies: NFS → SeaweedFS → Vault
+- name: Deploy NFS provisioner
+  hosts: localhost
+  connection: local
+  become: false
+  vars:
+    ansible_python_interpreter: "{{ playbook_dir }}/../../.venv/bin/python"
+  roles:
     - nfs-provisioner
+
+- name: Deploy SeaweedFS (requires NFS)
+  hosts: localhost
+  connection: local
+  become: false
+  vars:
+    ansible_python_interpreter: "{{ playbook_dir }}/../../.venv/bin/python"
+  roles:
     - seaweedfs
+
+- name: Deploy Vault (requires SeaweedFS)
+  hosts: localhost
+  connection: local
+  become: false
+  vars:
+    ansible_python_interpreter: "{{ playbook_dir }}/../../.venv/bin/python"
+  roles:
     - vault
-    - cert-manager
-    - metallb

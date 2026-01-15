@@ -11,11 +11,11 @@
     port: "{{ item }}"
     proto: tcp
   loop:
-    - 6443         # Kubernetes API server
-    - 2379:2380    # etcd server client API
-    - 10250        # Kubelet API
-    - 10251        # kube-scheduler
-    - 10257        # kube-controller-manager
+    - '6443'         # Kubernetes API server
+    - '2379:2380'    # etcd server client API
+    - '10250'        # Kubelet API
+    - '10251'        # kube-scheduler
+    - '10257'        # kube-controller-manager
   when: "'controlplane' in group_names"
 
 - name: Open worker node TCP ports
@@ -24,9 +24,9 @@
     port: "{{ item }}"
     proto: tcp
   loop:
-    - 10250        # Kubelet API
-    - 10256        # kube-proxy
-    - 30000:32767  # NodePort Services
+    - '10250'        # Kubelet API
+    - '10256'        # kube-proxy
+    - '30000:32767'  # NodePort Services
   when: "'workers' in group_names"
 
 - name: Open worker node UDP ports
@@ -35,7 +35,7 @@
     port: "{{ item }}"
     proto: udp
   loop:
-    - 30000:32767  # NodePort Services
+    - '30000:32767'  # NodePort Services
   when: "'workers' in group_names"
 
 - name: Open ports for pod networking (Calico)
@@ -54,9 +54,9 @@
     port: "{{ item }}"
     proto: tcp
   loop:
-    - 2049   # NFS
-    - 111    # rpcbind
-    - 20048  # mountd
+    - '2049'   # NFS
+    - '111'    # rpcbind
+    - '20048'  # mountd
 
 - name: Allow routed traffic
   ansible.builtin.command:

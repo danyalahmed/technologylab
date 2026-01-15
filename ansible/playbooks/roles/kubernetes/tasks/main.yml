@@ -9,6 +9,7 @@
       - gpg
     state: present
     update_cache: true
+    cache_valid_time: 3600
 
 - name: Create directory for Kubernetes keyring
   ansible.builtin.file:
@@ -29,6 +30,7 @@
     repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version_short }}/deb/ /"
     state: present
     filename: kubernetes
+    update_cache: true
 
 - name: Install kubeadm, kubelet, and kubectl
   ansible.builtin.apt:
@@ -38,6 +40,7 @@
       - kubectl
     state: present
     update_cache: true
+    cache_valid_time: 3600
 
 - name: Hold Kubernetes packages at current version
   ansible.builtin.dpkg_selections:

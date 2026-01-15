@@ -17,8 +17,11 @@
     name: argocd-server
     namespace: argocd
   register: argocd_status
-  until: argocd_status.resources[0].status.readyReplicas | default(0) > 0
-  retries: 20
+  until:
+    - argocd_status.resources | length > 0
+    - argocd_status.resources[0].status.readyReplicas is defined
+    - argocd_status.resources[0].status.readyReplicas | int > 0
+  retries: 30
   delay: 10
 
 - name: Register Private SSH Key for Git Repos

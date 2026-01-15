@@ -21,6 +21,7 @@
   hosts: k8s_nodes
   become: true
   become_method: ansible.builtin.sudo
+  strategy: free
 
   roles:
     - firewall
