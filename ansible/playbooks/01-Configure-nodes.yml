@@ -13,8 +13,13 @@
 #   - kubernetes: Install kubeadm, kubelet, kubectl
 #   - networking: Apply network fixes for Calico VXLAN
 #
+# Prerequisites:
+#   - Python dependencies installed (00-Prerequisites.yml)
+#   - SSH access to all nodes
+#   - sudo privileges on all nodes
+#
 # Usage:
-#   ansible-playbook -i hosts.ini playbooks/configure-nodes.yml
+#   ansible-playbook -i hosts.ini playbooks/01-Configure-nodes.yml
 # ============================================================================
 
 - name: Prepare Nodes for Kubernetes

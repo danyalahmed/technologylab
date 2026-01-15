@@ -10,9 +10,14 @@
 #   - python3-kubernetes: Kubernetes Python client
 #   - python3-yaml: YAML parsing library
 #   - ethtool: Network interface configuration tool
+#   - nfs-common: NFS client utilities
+#
+# Prerequisites:
+#   - SSH access to all nodes
+#   - sudo privileges on all nodes
 #
 # Usage:
-#   ansible-playbook -i hosts.ini playbooks/prerequisites.yml
+#   ansible-playbook -i hosts.ini playbooks/00-Prerequisites.yml
 # ============================================================================
 
 - name: Install Python Dependencies

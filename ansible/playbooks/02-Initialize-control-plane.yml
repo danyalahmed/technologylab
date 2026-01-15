@@ -13,14 +13,16 @@
 #   6. Deploy kubelet-csr-approver for automatic CSR approval
 #
 # Prerequisites:
-#   - All nodes must be configured (configure-nodes.yml)
+#   - All nodes must be configured (01-Configure-nodes.yml)
+#   - SSH access to control plane node
+#   - sudo privileges on control plane node
 #
 # Post-initialization:
 #   - Kubeconfig is available at ~/.kube/config on control plane
 #   - Kubeconfig is fetched to ansible/playbooks/temp_kubeconfig
 #
 # Usage:
-#   ansible-playbook -i hosts.ini playbooks/initialize-control-plane.yml
+#   ansible-playbook -i hosts.ini playbooks/02-Initialize-control-plane.yml
 # ============================================================================
 
 - name: Initialize Kubernetes Control Plane

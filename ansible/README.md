@@ -2,6 +2,10 @@
 
 Automated Kubernetes cluster setup with optimized playbooks for parallel execution.
 
+## Documentation
+
+📖 **[Detailed Playbooks Documentation](PLAYBOOKS.md)** - Complete guide to all playbooks, their purposes, prerequisites, and usage.
+
 ## Structure
 
 ```

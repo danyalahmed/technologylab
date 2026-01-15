@@ -1,4 +1,27 @@
 ---
+# ============================================================================
+# DEPLOY INFRASTRUCTURE SERVICES
+# ============================================================================
+# This playbook deploys infrastructure services and add-ons to the cluster.
+# Services are deployed in phases to respect dependencies.
+#
+# Deployment phases:
+#   1. Base infrastructure (parallel): metric-server, metallb, cert-manager
+#   2. Gateway API CRDs: Required before Istio
+#   3. Service mesh: istio, default-gateways
+#   4. Storage provisioner: nfs-provisioner
+#   5. Object storage: seaweedfs (requires NFS)
+#   6. Secrets management: vault (requires SeaweedFS)
+#
+# Prerequisites:
+#   - Cluster fully operational (03-Join-worker-nodes.yml completed)
+#   - kubectl access to cluster
+#   - Python virtual environment with Kubernetes libraries
+#
+# Usage:
+#   ansible-playbook playbooks/04-Ddeploy-infra.yml
+# ============================================================================
+
 # Base infrastructure - no dependencies
 - name: Deploy base infrastructure
   hosts: localhost

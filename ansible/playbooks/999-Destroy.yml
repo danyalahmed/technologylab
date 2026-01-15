@@ -1,4 +1,33 @@
 ---
+# ============================================================================
+# SAFE KUBERNETES CLUSTER DESTRUCTION
+# ============================================================================
+# This playbook safely removes the Kubernetes cluster and restores nodes
+# to a clean state for redeployment.
+#
+# Safety steps (executed in order):
+#   1. Graceful kubeadm reset on all nodes
+#   2. Stop Kubernetes services (kubelet, containerd)
+#   3. Unmount K8s/Calico/CSI filesystems safely
+#   4. Clean network interfaces (cni0, tunl0, vxlan.calico, etc.)
+#   5. Reset firewall while keeping SSH accessible
+#   6. Remove Kubernetes directories and files
+#   7. Restart containerd for future deployments
+#
+# Prerequisites:
+#   - SSH access to all nodes
+#   - sudo privileges on all nodes
+#   - Can be run on any cluster state (safe to re-run)
+#
+# Warning:
+#   - This will destroy the entire cluster
+#   - All data and workloads will be lost
+#   - Nodes will be restored to pre-Kubernetes state
+#
+# Usage:
+#   ansible-playbook -i hosts.ini playbooks/999-Destroy.yml
+# ============================================================================
+
 - name: Safe Kubernetes Removal
   hosts: all
   become: true
