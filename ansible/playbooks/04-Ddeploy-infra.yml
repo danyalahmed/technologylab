@@ -1,0 +1,18 @@
+---
+- name: Deploy infrastructure on Kubernetes
+  hosts: localhost
+  connection: local
+  become: false
+  vars:
+    ansible_python_interpreter: "{{ playbook_dir }}/../../.venv/bin/python"
+
+  roles:
+    - metric-server
+    - gateway-api
+    - istio
+    - default-gateways
+    - nfs-provisioner
+    - seaweedfs
+    - vault
+    - cert-manager
+    - metallb

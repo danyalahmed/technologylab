@@ -1,0 +1,58 @@
+---
+- name: Create istio-system Namespace
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: istio-system
+
+- name: Add istio Helm Repository
+  delegate_to: localhost
+  kubernetes.core.helm_repository:
+    name: istio
+    repo_url: https://istio-release.storage.googleapis.com/charts
+
+- name: Deploy Istio Base Chart
+  delegate_to: localhost
+  kubernetes.core.helm:
+    name: istio-base
+    chart_ref: istio/base
+    chart_version: "{{ istio_version }}"
+    release_namespace: istio-system
+    values:
+      defaultRevision: default
+
+- name: Deploy Istiod with Ambient Profile
+  delegate_to: localhost
+  kubernetes.core.helm:
+    name: istio-istiod
+    chart_ref: istio/istiod
+    chart_version: "{{ istio_version }}"
+    release_namespace: istio-system
+    values:
+      profile: ambient
+      pilot:
+        env:
+          PILOT_ENABLE_AMBIENT: "true"
+        cni:
+          enabled: true
+
+- name: Deploy Istio CNI
+  delegate_to: localhost
+  kubernetes.core.helm:
+    name: istio-cni
+    chart_ref: istio/cni
+    chart_version: "{{ istio_version }}"
+    release_namespace: istio-system
+    values:
+      profile: ambient
+
+- name: Deploy Istio ztunnel
+  delegate_to: localhost
+  kubernetes.core.helm:
+    name: istio-ztunnel
+    chart_ref: istio/ztunnel
+    chart_version: "{{ istio_version }}"
+    release_namespace: istio-system

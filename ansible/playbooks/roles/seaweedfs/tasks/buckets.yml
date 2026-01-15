@@ -1,0 +1,26 @@
+---
+- name: Wait for SeaweedFS Filer pod to be Ready
+  kubernetes.core.k8s_info:
+    kind: Pod
+    wait: true
+    name: seaweedfs-cluster-filer-0
+    namespace: seaweedfs
+    wait_condition:
+      type: Ready
+      status: "True"
+    wait_timeout: 300  # Wait up to 5 minutes
+- name: Create SeaweedFS Buckets
+  kubernetes.core.k8s_exec:
+    namespace: seaweedfs
+    pod: seaweedfs-cluster-filer-0
+    # We pipe the command into weed shell so it exits after execution
+    command: >
+      sh -c 'echo "mkdir /buckets/{{ item }}" | weed shell -filer=localhost:8888 -master=seaweedfs-cluster-master:9333'
+  loop: "{{ seaweedfs_buckets }}"
+  register: seaweedfs_bucket_out
+  # Check stderr/stdout for "already exists" to keep the task idempotent
+  failed_when:
+    - seaweedfs_bucket_out.rc != 0
+    - "'already exists' not in seaweedfs_bucket_out.stdout"
+    - "'already exists' not in seaweedfs_bucket_out.stderr"
+  changed_when: "'mkdir' in seaweedfs_bucket_out.stdout"

@@ -1,0 +1,46 @@
+---
+- name: Deploy HTTPS Gateway
+  kubernetes.core.k8s:
+    state: present
+    api_version: gateway.networking.k8s.io/v1
+    kind: Gateway
+    name: secure-gw
+    namespace: istio-system
+    definition:
+      spec:
+        gatewayClassName: istio
+        listeners:
+          - name: https
+            port: 443
+            protocol: HTTPS
+            tls:
+              mode: Terminate
+              certificateRefs:
+                - name: technologylab.uk-wildcard-tls
+            allowedRoutes:
+              namespaces:
+                from: All
+          - name: http
+            port: 80
+            protocol: HTTP
+            allowedRoutes:
+              namespaces:
+                from: All
+- name: Deploy HTTP to HTTPS Redirect
+  kubernetes.core.k8s:
+    state: present
+    api_version: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    name: https-redirect
+    namespace: istio-system
+    definition:
+      spec:
+        parentRefs:
+          - name: secure-gw
+            sectionName: http
+        rules:
+          - filters:
+              - type: RequestRedirect
+                requestRedirect:
+                  scheme: https
+                  statusCode: 301

@@ -1,0 +1,49 @@
+---
+- name: Ensure MetalLB namespace exists
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: metallb-system
+    state: present
+
+- name: Apply MetalLB manifests
+  kubernetes.core.k8s:
+    state: present
+    src: "https://raw.githubusercontent.com/metallb/metallb/{{ metallb_version }}/config/manifests/metallb-native.yaml"
+
+- name: Wait for MetalLB controller deployment to be ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: metallb-system
+    name: controller
+  register: metallb_controller_deployment
+  until: metallb_controller_deployment.resources[0].status.readyReplicas == metallb_controller_deployment.resources[0].status.replicas
+  retries: 3
+  delay: 15
+
+- name: Configure MetalLB IPAddressPool
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: metallb.io/v1beta1
+      kind: IPAddressPool
+      metadata:
+        namespace: metallb-system
+        name: metallb-ip-pool
+      spec:
+        addresses:
+          - "{{ metallb_ip_range }}"
+    state: present
+
+- name: Configure MetalLB L2Advertisement
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: metallb.io/v1beta1
+      kind: L2Advertisement
+      metadata:
+        namespace: metallb-system
+        name: metallb-l2-advertisement
+      spec:
+        ipAddressPools:
+          - metallb-ip-pool
+    state: present

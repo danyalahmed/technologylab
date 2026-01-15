@@ -1,0 +1,36 @@
+---
+- name: Ensure NFS Provisioner Namespace Exists
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: nfs-provisioner
+
+- name: Add Helm repo for NFS Subdir External Provisioner
+  kubernetes.core.helm_repository:
+    name: nfs-subdir-external-provisioner
+    repo_url: https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
+
+- name: Deploy NFS Provisioner Helm Chart
+  kubernetes.core.helm:
+    name: nfs-provisioner
+    chart_ref: nfs-subdir-external-provisioner/nfs-subdir-external-provisioner
+    chart_version: "{{ nfs_provisioner_version }}"
+    release_namespace: nfs-provisioner
+    values:
+      nfs:
+        server: "{{ nfs_server_ip }}"
+        path: "{{ nfs_mount_path }}"
+      storageClass:
+        name: nfs-client
+        pathPattern: "${.PVC.namespace}/${.PVC.name}"
+        reclaimPolicy: Retain
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "256Mi"
+          cpu: "200m"

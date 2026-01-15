@@ -48,6 +48,16 @@
     - { port: '5473', proto: 'tcp' }   # Calico Typha
     - { port: '179', proto: 'tcp' }    # BGP
 
+- name: Allow NFS traffic
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - 2049   # NFS
+    - 111    # rpcbind
+    - 20048  # mountd
+
 - name: Allow routed traffic
   ansible.builtin.command:
     cmd: ufw default allow routed

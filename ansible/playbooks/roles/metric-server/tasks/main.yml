@@ -1,0 +1,22 @@
+---
+- name: Create metric-server namespace
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: metric-server
+    state: present
+
+- name: Add Metrics Server Helm Repo
+  kubernetes.core.helm_repository:
+    name: metrics-server
+    repo_url: https://kubernetes-sigs.github.io/metrics-server/
+  delegate_to: localhost
+  become: false
+
+- name: Deploy Metrics Server Helm Chart
+  delegate_to: localhost
+  kubernetes.core.helm:
+    name: metric-server
+    chart_ref: metrics-server/metrics-server
+    chart_version: "{{ metric_server_version }}"
+    release_namespace: metric-server

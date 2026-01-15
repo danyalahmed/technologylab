@@ -1,0 +1,50 @@
+---
+- name: Extract Vault credentials
+  ansible.builtin.set_fact:
+    vault_s3_access_key: "{{ (s3_identities | selectattr('name', 'equalto', 'vault') | first).access_key }}"
+    vault_s3_secret_key: "{{ (s3_identities | selectattr('name', 'equalto', 'vault') | first).secret_key }}"
+
+- name: Add HasiCorp Helm Repo
+  kubernetes.core.helm_repository:
+    name: hashicorp
+    repo_url: https://helm.releases.hashicorp.com
+  delegate_to: localhost
+  become: false
+  changed_when: false
+
+- name: Create Vault Namespace
+  kubernetes.core.k8s:
+    state: present
+    kind: Namespace
+    name: vault
+  become: false
+
+- name: Deploy Vault Helm Chart
+  delegate_to: localhost
+  kubernetes.core.helm:
+    name: vault
+    chart_ref: hashicorp/vault
+    chart_version: "{{ vault_version }}"
+    release_namespace: vault
+    values:
+      server:
+        dataStorage:
+          enabled: false # disabled as we use s3 storage backend
+        ha:
+          enabled: true
+          replicas: 1
+          config: |
+            ui = true
+            listener "tcp" {
+              address     = "[::]:8200"
+              tls_disable = "true"
+            }
+            storage "s3" {
+              bucket     = "vault-storage"
+              region     = "local"
+              access_key = "{{ vault_s3_access_key }}"
+              secret_key = "{{ vault_s3_secret_key }}"
+              endpoint   = "http://seaweedfs-cluster-filer.seaweedfs.svc:8333"
+              disable_ssl = "true"
+              s3_force_path_style = "true"
+            }

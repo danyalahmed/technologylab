@@ -117,6 +117,7 @@
       kubernetes.core.k8s:
         state: present
         src: https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/tigera-operator.yaml
+
     - name: Wait for Tigera Operator to be ready
       kubernetes.core.k8s_info:
         kind: Deployment
@@ -127,6 +128,7 @@
       retries: 10
       delay: 15
       become: false
+
     - name: Get Calico Custom Resources manifest
       ansible.builtin.get_url:
         url: https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/custom-resources.yaml
@@ -134,39 +136,41 @@
         mode: '0644'
       changed_when: false
       become: false
+
     - name: Patch Pod Network CIDR in Calico Custom Resources
       ansible.builtin.replace:
         path: /tmp/calico-custom-resources.yaml
         regexp: '192\.168\.0\.0/16'
         replace: "{{ pod_network_cidr }}"
       become: false
+
     - name: Apply Calico Custom Resources
       kubernetes.core.k8s:
         state: present
         src: /tmp/calico-custom-resources.yaml
       become: false
+
     - name: Fetch kubeconfig to local machine
       ansible.builtin.fetch:
         src: /etc/kubernetes/admin.conf
-        dest: "./temp_kubeconfig"
+        dest: "{{ kubeconfig }}"
         flat: true # Keeps it from creating a deep directory structure
       become: true
       when: kube_init_check.stat.exists
+
     - name: Add kubelet-csr-approver chart repo
-      ansible.builtin.shell: |
-        helm repo add kubelet-csr-approver https://postfinance.github.io/kubelet-csr-approver
-        helm repo update
+      kubernetes.core.helm_repository:
+        name: kubelet-csr-approver
+        repo_url: https://postfinance.github.io/kubelet-csr-approver
       delegate_to: localhost
       become: false
       changed_when: false
-
     # issues with helm 4 and ansible kubernetes.core.helm module
     # - name: Deploy kubelet-csr-approver
     #   kubernetes.core.helm:
     #     name: kubelet-csr-approver
     #     chart_ref: kubelet-csr-approver/kubelet-csr-approver
     #     release_namespace: kube-system
-    #     kubeconfig: "./temp_kubeconfig"
     #     values:
     #       providerRegex: "{{ kubelet_csr_regex }}"
     #       providerIpPrefixes: "{{ kubelet_csr_ip_prefixes }}"
@@ -179,7 +183,7 @@
       ansible.builtin.shell: |
         helm upgrade --install kubelet-csr-approver kubelet-csr-approver/kubelet-csr-approver \
           --namespace kube-system \
-          --kubeconfig ./temp_kubeconfig \
+          --kubeconfig ~/.kube/new_kubeconfig \
           --set providerRegex={{ kubelet_csr_regex | quote }} \
           --set providerIpPrefixes={{ kubelet_csr_ip_prefixes | quote }} \
           --set maxExpirationSeconds=86400 \

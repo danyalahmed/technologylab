@@ -1,0 +1,17 @@
+{
+  "identities": [
+{% for identity in s3_identities %}
+    {
+      "name": "{{ identity.name }}",
+      "credentials": [
+        {
+          "accessKey": "{{ identity.access_key }}",
+          "secretKey": "{{ identity.secret_key }}"
+        }
+      ],
+      "actions": {{ identity.actions | to_json }}{% if identity.buckets is defined %},
+      "buckets": {{ identity.buckets | to_json }}{% endif %}
+    }{{ "," if not loop.last else "" }}
+{% endfor %}
+  ]
+}

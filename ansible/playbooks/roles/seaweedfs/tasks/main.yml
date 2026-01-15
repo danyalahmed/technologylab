@@ -1,0 +1,101 @@
+---
+- name: Lable nodes for SeaweedFS
+  kubernetes.core.k8s:
+    state: patched
+    kind: Node
+    name: "{{ groups['workers'][0] }}"
+    definition:
+      metadata:
+        labels:
+          seaweedfs-storage: "true"
+
+- name: Create SeaweedFS Namespace
+  kubernetes.core.k8s:
+    name: seaweedfs
+    kind: Namespace
+    state: present
+
+- name: Add SeaweedFS Helm Repo
+  delegate_to: localhost
+  kubernetes.core.helm_repository:
+    name: seaweedfs-operator
+    repo_url: "https://seaweedfs.github.io/seaweedfs-operator"
+    repo_state: present
+
+- name: Deploy SeaweedFS Operator via Helm
+  delegate_to: localhost
+  kubernetes.core.helm:
+    name: seaweedfs-operator
+    chart_ref: seaweedfs-operator/seaweedfs-operator
+    chart_version: "{{ seaweedfs_version }}"
+    namespace: seaweedfs
+
+- name: Create SeaweedFS S3 config secret
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: seaweedfs-s3-config
+        namespace: seaweedfs
+      data:
+        s3-config.json: "{{ lookup('template', 's3-config.json.j2') | b64encode }}"
+
+- name: Deploy Seaweedfs config
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: seaweed.seaweedfs.com/v1
+      kind: Seaweed
+      metadata:
+        name: seaweedfs-cluster
+        namespace: seaweedfs
+      spec:
+        image: "chrislusf/seaweedfs:4.06"
+        master:
+          volumeSizeLimitMB: 1024
+          nodeSelector:
+            seaweedfs-storage: "true"
+          replicas: 1
+          volumes:
+            - name: master-data
+              hostPath:
+                path: /var/lib/k8s-pv/seaweedfs/master
+                type: DirectoryOrCreate
+          volumeMounts:
+            - name: master-data
+              mountPath: /data
+        # VOLUME: Actual Data on NFS
+        volume:
+          replicas: 1
+          requests:
+            storage: 100G
+          storageClassName: nfs-client
+        # Filer Configuration
+        filer:
+          # If the secret changes, this string changes, and K8s restarts the pods.
+          annotations:
+            checksum/s3-config: "{{ lookup('template', 's3-config.json.j2') | checksum }}"
+          nodeSelector:
+            seaweedfs-storage: "true"
+          replicas: 1
+          volumes:
+            - name: filer-data
+              hostPath:
+                path: /var/lib/k8s-pv/seaweedfs/filer
+                type: DirectoryOrCreate
+          volumeMounts:
+            - name: filer-data
+              mountPath: /data
+          s3:
+            enabled: true
+            configSecret:
+              name: seaweedfs-s3-config
+              key: s3-config.json
+          config: |
+            [leveldb2]
+            enabled = true
+            dir = "/data/filerldb2"
+- name: Include bucket creation tasks
+  ansible.builtin.include_tasks: buckets.yml
