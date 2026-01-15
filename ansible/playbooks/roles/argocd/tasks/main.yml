@@ -63,6 +63,30 @@
             annotations:
               kubectl.kubernetes.io/restartedAt: "{{ ansible_date_time.iso8601 }}"
 
+
+- name: Disable TLS verification in ArgoCD
+  kubernetes.core.k8s:
+    state: patched
+    kind: ConfigMap
+    name: argocd-cmd-params-cm
+    namespace: argocd
+    definition:
+      data:
+        server.insecure: "true"
+
+- name: Restart ArgoCD Server to apply changes
+  kubernetes.core.k8s:
+    state: patched
+    kind: Deployment
+    name: argocd-server
+    namespace: argocd
+    definition:
+      spec:
+        template:
+          metadata:
+            annotations:
+              kubectl.kubernetes.io/restartedAt: "{{ ansible_date_time.iso8601 }}"
+
 - name: Deploy ArgoCD Projects
   kubernetes.core.k8s:
     state: present

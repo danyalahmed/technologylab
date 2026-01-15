@@ -37,6 +37,7 @@
       spec:
         parentRefs:
           - name: secure-gw
+            namespace: istio-system
             sectionName: http
         rules:
           - filters:
