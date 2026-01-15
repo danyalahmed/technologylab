@@ -7,7 +7,7 @@ spec:
   project: infrastructure
   source:
     path: argocd/infrastructure/headlamp
-    repoURL: git@github.com:danyalahmed/technologylab.git"
+    repoURL: git@github.com:danyalahmed/technologylab.git
     targetRevision: HEAD    
   destination:
     server: https://kubernetes.default.svc
