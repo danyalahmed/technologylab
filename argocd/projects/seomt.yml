@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: seomt
+  namespace: argocd
+  # Finalizer ensures that the project isn't deleted until apps are gone
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: "Self Employment Opportunity Money Tracker Applications"
+
+  # Allow manifests to come from any repository you've connected
+  sourceRepos:
+  - "*"
+
+  # Allow deployment to the local cluster and any namespace
+  destinations:
+  - namespace: "*"
+    server: https://kubernetes.default.svc
+
+  # Allow this project to create Cluster-level resources (like CRDs and Namespaces)
+  clusterResourceWhitelist:
+  - group: "*"
+    kind: "*"

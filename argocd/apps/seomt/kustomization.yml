@@ -1,0 +1,10 @@
+# Inside your repo's kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+helmCharts:
+  - name: app
+    repo: git@github.com:danyalahmed/Helm-Chart.git//
+    version: v1.0.8
+    releaseName: seomt
+    valuesFile: values.yaml

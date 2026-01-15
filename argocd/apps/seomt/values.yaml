@@ -1,0 +1,63 @@
+namespace:
+  name: seomt
+
+replicaCount: 1
+image:
+  repository: localregistry.technologylab.uk/seomt
+  pullPolicy: Always
+  tag: "v1.0.11"
+
+serviceAccount:
+  create: true
+  automount: true
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+
+volumes: 
+- name: seomt
+  persistentVolumeClaim:
+    claimName: seomt
+
+volumeMounts:
+- name: seomt
+  mountPath: /app/wwwroot/uploads
+  subPath: uploads
+- name: seomt
+  mountPath: /app/wwwroot/reports
+  subPath: reports
+
+env:
+  - name: ASPNETCORE_ENVIRONMENT
+    value: Production
+  - name: ConnectionStrings__DefaultConnection
+    valueFrom:
+      secretKeyRef:
+        name: seomt-secrets
+        key: DefaultConnection
+
+externalSecrets:
+  enabled: true
+  secrets:
+    - secretKey: DefaultConnection
+      remoteRef:
+        key: seomt
+        property: "DefaultConnection"
