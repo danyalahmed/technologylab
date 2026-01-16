@@ -1,5 +1,6 @@
 namespace:
   name: seomt
+fullnameOverride: "seomt"
 
 replicaCount: 1
 image:
