@@ -1,0 +1,7 @@
+---
+- name: Reboot node
+  ansible.builtin.reboot:
+    msg: "Rebooting the node to apply changes."
+    pre_reboot_delay: 5
+    reboot_timeout: 600
+    post_reboot_delay: 10

@@ -55,6 +55,7 @@
   roles:
     - istio
     - default-gateways
+    - envoy-filters
 
 # Storage layer - sequential dependencies: NFS → SeaweedFS → Vault
 - name: Deploy NFS provisioner
