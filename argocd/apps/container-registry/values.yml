@@ -1,0 +1,8 @@
+service:
+  type: ClusterIP
+persistence: true
+pvc:
+  storageClassName: nfs-client
+  accessModes:
+    - ReadWriteOnce
+  size: 20Gi
