@@ -1,0 +1,22 @@
+---
+- name: EnvoyFilter for request body size
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: networking.istio.io/v1alpha3
+      kind: EnvoyFilter
+      metadata:
+        name: unlimited-request-body-size
+        namespace: istio-system
+      spec:
+        workloadSelector:
+          labels:
+            gateway.networking.k8s.io/gateway-name: secure-gw
+        configPatches:
+          - applyTo: LISTENER
+            match:
+              context: GATEWAY
+            patch:
+              operation: MERGE
+              value:
+                perConnectionBufferLimitBytes: 0
