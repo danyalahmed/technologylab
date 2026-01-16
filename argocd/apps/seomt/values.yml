@@ -3,7 +3,7 @@ namespace:
 
 replicaCount: 1
 image:
-  repository: localregistry.technologylab.uk/seomt
+  repository: zot.technologylab.uk/seomt
   pullPolicy: Always
   tag: "v1.0.11"
 

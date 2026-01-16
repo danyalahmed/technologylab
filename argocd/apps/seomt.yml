@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: seomt
+  namespace: argocd
+spec:
+  project: seomt
+  sources:
+    - repoURL: 'git@github.com:danyalahmed/Helm-Chart.git'
+      targetRevision: v1.0.11
+      path: '.' 
+      helm:
+        # Reference the values file 
+        valueFiles:
+          - $values/argocd/apps/seomt/values.yml
+
+    - repoURL: git@github.com:danyalahmed/technologylab.git
+      targetRevision: main
+      path: argocd/apps/seomt
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: seomt
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
