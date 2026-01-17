@@ -16,8 +16,22 @@ service:
   type: ClusterIP
   port: 8080
 
-ingress:
-  enabled: false
+httproute:
+  enabled: true
+  gatwayName: secure-gw
+  gatewayNamespace: istio-system
+  hostname:
+  - seomt.technologylab.uk
+  rules:
+    - matches:
+      - path:
+          type: Prefix
+          value: /
+      backends:
+      - service:
+          name: seomt
+          port:
+            number: 8080
 
 resources:
   limits:
